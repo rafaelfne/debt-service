@@ -51,6 +51,10 @@
         "test": [
             "@php artisan config:clear --ansi",
             "@php vendor/bin/pest"
+        ],
+        "test:coverage": [
+            "@php artisan config:clear --ansi",
+            "@php vendor/bin/pest --coverage --min=100"
         ]
     },
     "extra": {
