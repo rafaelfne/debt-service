@@ -21,7 +21,7 @@ it('preserves float tokens as strings when FLOATS_AS_STRINGS is set', function (
 });
 
 it('returns quoted decimal strings verbatim', function (): void {
-    $reader = new JsonReader();
+    $reader = new JsonReader;
     $reader->json('{"valor": "1500.00"}');
 
     $reader->read();
