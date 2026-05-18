@@ -43,9 +43,14 @@ php artisan serve --port=8001
 
 ```bash
 composer test                       # roda Pest
+composer test:coverage              # exige 100% no app/Domain + app/Application (precisa de Xdebug/PCOV)
 ./vendor/bin/pest --filter=...      # filtra um teste específico
-./vendor/bin/pest --coverage        # com cobertura (precisa de Xdebug/PCOV)
 ```
+
+> O CI mantém um gate de **100% de cobertura** em `app/Domain/` e `app/Application/` (job
+> `coverage` em `.github/workflows/ci.yml`). Infrastructure é fora do escopo do gate por
+> agora — adapters de provider serão avaliados por testes de contrato (I6.x), não por
+> percentual de linha.
 
 ---
 
