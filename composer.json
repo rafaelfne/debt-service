@@ -1,0 +1,6 @@
+{
+    "require": {
+        "brick/math": "^0.17.1",
+        "pcrov/jsonreader": "^1.0"
+    }
+}
