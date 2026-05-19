@@ -17,6 +17,7 @@ use App\Domain\Payment\PixSimulator;
 use App\Infrastructure\Logging\DemoLogger;
 use App\Infrastructure\Providers\ProviderAJsonAdapter;
 use App\Infrastructure\Providers\ProviderBXmlAdapter;
+use App\Infrastructure\Providers\ProviderCCsvAdapter;
 use App\Infrastructure\Resilience\CircuitBreaker;
 use App\Infrastructure\Resilience\CircuitBreakerDebtProvider;
 use App\Infrastructure\Resilience\ProviderChain;
@@ -96,9 +97,18 @@ class AppServiceProvider extends ServiceProvider
                         ),
                         breaker: $this->makeBreaker(),
                     ),
+                    new CircuitBreakerDebtProvider(
+                        inner: new ProviderCCsvAdapter(
+                            baseUrl: (string) config('business.providers.c.url'),
+                            timeoutSeconds: (int) config('business.providers.c.timeout'),
+                            retryAttempts: (int) config('business.providers.c.retries'),
+                            retryBackoffMs: (int) config('business.providers.c.backoff_ms'),
+                        ),
+                        breaker: $this->makeBreaker(),
+                    ),
                 ],
                 budgetSeconds: (float) config('business.resilience.chain_budget_seconds'),
-                providerNames: ['Provider A', 'Provider B'],
+                providerNames: ['Provider A', 'Provider B', 'Provider C'],
                 demoLog: $demoLog,
             );
         });
