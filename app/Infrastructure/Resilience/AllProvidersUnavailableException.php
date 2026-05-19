@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace App\Infrastructure\Resilience;
 
 use App\Application\Ports\ProviderUnavailableException;
-use RuntimeException;
+use App\Domain\Exceptions\DomainException;
 
-final class AllProvidersUnavailableException extends RuntimeException
+final class AllProvidersUnavailableException extends DomainException
 {
     /**
      * @param  list<ProviderUnavailableException>  $errors

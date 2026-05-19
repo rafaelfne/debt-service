@@ -4,6 +4,6 @@ declare(strict_types=1);
 
 namespace App\Domain\Plate;
 
-use InvalidArgumentException;
+use App\Domain\Exceptions\DomainException;
 
-class InvalidPlateException extends InvalidArgumentException {}
+final class InvalidPlateException extends DomainException {}

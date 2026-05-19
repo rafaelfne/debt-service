@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Domain\Debt;
 
-use RuntimeException;
+use App\Domain\Exceptions\DomainException;
 
-class UnknownDebtTypeException extends RuntimeException
+final class UnknownDebtTypeException extends DomainException
 {
     public function __construct(public readonly string $type)
     {
