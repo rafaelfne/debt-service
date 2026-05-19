@@ -6,6 +6,37 @@ Guia de desenvolvimento para o **Serviço de Consulta e Simulação de Débitos 
 
 ---
 
+## 0. Cheat sheet (demo ao vivo)
+
+**Status do projeto:** todos os 10 épicos / 38 sub-issues fechados (PRs #50–#94). 200 testes / 421 assertions verdes; 100% coverage em `app/Domain` + `app/Application` no CI.
+
+**Comandos quentes pra demo:**
+```bash
+composer test                              # 200 passed em ~3s
+composer test:coverage                     # gate 100% domain+application (precisa pcov)
+./vendor/bin/pest --filter=Money           # filtra por nome de classe/teste
+./vendor/bin/pint --test                   # checa estilo
+php artisan serve                          # API em :8000
+./docs/curls/happy-path.sh | jq            # canon do enunciado byte-a-byte
+./docs/curls/invalid-plate.sh              # 422 validation_failed
+./docs/curls/all-providers-down.sh         # 503 all_providers_unavailable (após ajustar .env)
+```
+
+**Pontos pra abrir primeiro quando o avaliador pedir uma mudança:**
+- Adicionar tipo de débito → §7.2 deste arquivo
+- Adicionar provider → §7.1
+- Trocar taxa de juros → §7.4
+- Mudar shape do JSON de saída → `app/Infrastructure/Http/Resources/DebtResponseResource.php`
+- Mudar validação da placa → `app/Domain/Plate/Plate.php` (regex em `PATTERN`); `PlateRule` herda automaticamente
+
+**O que NÃO mexer durante demo (invariantes #1 a #10 da §4):**
+- Construtor de `Money` aceitando float — todo monetário é string
+- Catch genérico de `Throwable` em adapters — domain exceptions propagam raw
+- Arredondamento intermediário em policies — só `Money::toString` arredonda
+- Mock routes sem o guard `! app()->isProduction()`
+
+---
+
 ## 1. Visão geral
 
 API HTTP em PHP/Laravel que recebe uma placa veicular, consulta dois providers externos (JSON e XML), calcula juros sobre débitos em atraso e simula formas de pagamento (Pix com desconto e Cartão em 1x/6x/12x).
@@ -129,20 +160,21 @@ Toda comparação de "dias em atraso" usa **UTC**. A data de referência é pass
 
 ---
 
-## 6. Workflow com issues
+## 6. Workflow com issues (histórico)
 
-O projeto tem **10 épicos / 38 sub-issues** no GitHub. Veja `https://github.com/rafaelfne/debt-service/issues`.
+O projeto teve **10 épicos / 38 sub-issues** no GitHub — todos fechados. Veja `https://github.com/rafaelfne/debt-service/issues?state=closed`.
 
-**Ordem recomendada (bottom-up):**
+**Ordem executada (bottom-up):**
 ```
 Feature 1 → 2 → 3 ⚠️ → 4 ⚠️ → 5 → 6 ⚠️ → 7 → 8 → 9 → 10
 ```
 
-**Gates de revisão** (Features 3, 4, 6 — marcadas com ⚠️):
-- Antes da implementação: rever plano com humano.
-- Depois da implementação: rever testes com humano antes de fechar o épico.
+**Gates de revisão** (Features 3, 4, 6 — marcadas com ⚠️) tiveram revisão de plano antes da implementação. Decisões dos gates estão registradas nos PRs:
+- Feature 3 (#65): rounding mora no `Money::toString`; `referenceDate` no construtor do `InterestCalculator`; canon combinado em `InterestCalculatorTest`.
+- Feature 4 (#70): shape JSON em PT-BR com `cartao_credito` (não `cartao`); lista vazia → `[TOTAL=0.00]`; ordem das `SOMENTE_` por primeira ocorrência.
+- Feature 6 (#80): shape dos providers em inglês snake_case; `2s timeout + 3 retries`; mocks só fora de produção.
 
-**Cada sub-issue** tem no GitHub: critérios de aceitação, casos de teste obrigatórios, escopo técnico (arquivos + skeleton) e Definition of Done. Use-os como contrato.
+**Cada sub-issue** tinha no GitHub: critérios de aceitação, casos de teste obrigatórios, escopo técnico (arquivos + skeleton) e Definition of Done — usados como contrato durante a execução.
 
 ---
 
