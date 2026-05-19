@@ -139,7 +139,12 @@ A alternativa "consenso" fica como melhoria futura, exigindo regra explícita de
   compartilham — risco de "thundering herd" parcial. Mover para Redis se for horizontal.
 - **Tipos de débito:** apenas `IPVA` e `MULTA`. Adicionar `LICENCIAMENTO` é uma nova
   `InterestPolicy` + registro no service provider (guia em `CLAUDE.md` §7).
-- **Resposta para lista vazia:** comportamento definido em I5.3.
+- **Resposta para lista vazia:** quando o provider retorna `[]`, o `QueryDebtsUseCase`
+  emite `debitos: []`, `resumo` zerado (`total_original`/`total_atualizado = "0.00"`) e
+  uma única opção `TOTAL` com `valor_base = "0.00"`. HTTP 200, não 204 — a placa existe,
+  só não tem débitos. Trade-off: o array `pagamentos.opcoes` nunca volta vazio, o que
+  facilita o consumidor mas custa ~50 bytes a mais. Pode ser revisado em I8.5 se o
+  enunciado pedir 204.
 - **Observabilidade:** logs estruturados com placa mascarada. Métricas/tracing
   (OpenTelemetry) ficam para uma issue dedicada.
 - **Frontend:** o skeleton Laravel trouxe Vite + `package.json`. Mantidos por padrão,
