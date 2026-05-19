@@ -64,10 +64,29 @@ RUN composer install --no-dev --optimize-autoloader
 CMD ["php", "artisan", "serve", "--host=0.0.0.0", "--port=8000"]
 ```
 
+### Sobrescrever taxas/timeouts em runtime (sem refactor)
+
+Todas as 14 constantes de regra de negócio + infra moram em [`config/business.php`](config/business.php), com fallback para defaults canônicos do enunciado. Para mudar em demo, descomente a linha no `.env` e reinicie:
+
+```bash
+# Exemplos
+IPVA_DAILY_RATE=0.005       # IPVA a 0,5%/dia
+IPVA_CAP_RATE=0.15          # teto do juro pra 15% do valor
+MULTA_DAILY_RATE=0.02       # MULTA a 2%/dia
+PIX_DISCOUNT_FACTOR=0.90    # Pix com 10% de desconto
+CC_MONTHLY_RATE=0.03        # cartão a 3% a.m.
+PROVIDER_A_TIMEOUT=5        # timeout HTTP do Provider A (segundos)
+CHAIN_BUDGET_SECONDS=10     # budget total do chain
+CB_FAILURE_THRESHOLD=3      # trip circuit em 3 falhas
+HTTP_MAX_BODY_BYTES=2097152 # aumentar body limit pra 2 MiB
+```
+
+Lista completa em `.env.example`. `CLAUDE.md` §0 mostra tabela compacta para consulta rápida durante apresentação.
+
 ### Rodar os testes
 
 ```bash
-composer test                       # 200 passed (421 assertions) — Pest
+composer test                       # 207 passed (431 assertions) — Pest
 composer test:coverage              # exige 100% no app/Domain + app/Application (precisa de Xdebug/PCOV)
 ./vendor/bin/pest --filter=Money    # filtra um teste específico
 ./vendor/bin/pint --test            # checa estilo (Laravel Pint)

@@ -22,14 +22,18 @@ use Throwable;
 
 final class ProviderAJsonAdapter implements DebtProvider
 {
-    private const TIMEOUT_SECONDS = 2;
-
-    private const RETRY_ATTEMPTS = 3;
-
-    private const RETRY_BACKOFF_MS = 100;
-
+    /**
+     * Network parameters default to the canon `2s / 3 retries / 100ms` from the
+     * project's resilience design. AppServiceProvider wires actual values from
+     * `config('business.providers.a.*')` so demo-time edits in `.env` flow in
+     * without touching this class.
+     */
     public function __construct(
         private readonly string $baseUrl,
+        private readonly int $timeoutSeconds = 2,
+        private readonly int $retryAttempts = 3,
+        private readonly int $retryBackoffMs = 100,
+        private readonly string $simulateFailure = '',
     ) {}
 
     public function fetchDebts(Plate $plate): array
@@ -42,17 +46,20 @@ final class ProviderAJsonAdapter implements DebtProvider
     private function request(Plate $plate): Response
     {
         try {
-            $response = Http::timeout(self::TIMEOUT_SECONDS)
+            $response = Http::timeout($this->timeoutSeconds)
                 ->retry(
-                    times: self::RETRY_ATTEMPTS,
-                    sleepMilliseconds: self::RETRY_BACKOFF_MS,
+                    times: $this->retryAttempts,
+                    sleepMilliseconds: $this->retryBackoffMs,
                     // Only retry on transient failures; 4xx is deterministic.
                     when: fn (Throwable $e): bool => $e instanceof ConnectionException
                         || ($e instanceof RequestException && $e->response->serverError()),
                     throw: false,
                 )
                 ->acceptJson()
-                ->get("{$this->baseUrl}/debts/{$plate->toString()}");
+                ->get(
+                    "{$this->baseUrl}/debts/{$plate->toString()}",
+                    $this->simulateFailure !== '' ? ['fail' => $this->simulateFailure] : [],
+                );
         } catch (ConnectionException $e) {
             throw new ProviderUnavailableException(
                 "Provider A unreachable: {$e->getMessage()}",

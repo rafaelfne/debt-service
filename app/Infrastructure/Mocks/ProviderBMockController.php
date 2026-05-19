@@ -8,6 +8,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Symfony\Component\HttpFoundation\Response as HttpResponse;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 final class ProviderBMockController
 {
@@ -34,11 +35,20 @@ final class ProviderBMockController
         $fail = $request->query('fail');
 
         if ($fail === 'timeout') {
-            sleep(10);
-
-            return new Response('<?xml version="1.0"?><ok/>', 200, [
-                'Content-Type' => 'application/xml',
-            ]);
+            // Sleep up to 10s but bail out as soon as the client aborts,
+            // so the worker isn't held hostage after a provider timeout.
+            return new StreamedResponse(function (): void {
+                ignore_user_abort(true);
+                for ($i = 0; $i < 100; $i++) {
+                    usleep(100_000); // 100ms
+                    echo ' ';
+                    @flush();
+                    if (connection_aborted()) {
+                        return;
+                    }
+                }
+                echo '<ok/>';
+            }, 200, ['Content-Type' => 'application/xml']);
         }
 
         if ($fail === '500') {
