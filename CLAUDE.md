@@ -32,6 +32,7 @@ composer dev                               # API em :8000 com workers concorrent
 | Pix com X% de desconto | `PIX_DISCOUNT_FACTOR=0.90` | `0.95` |
 | Cartão a X% a.m. | `CC_MONTHLY_RATE=0.03` | `0.025` |
 | Aumentar timeout do provider | `PROVIDER_A_TIMEOUT=5` | `2` |
+| Forçar timeout/erro num mock | `PROVIDER_A_FAIL=timeout` (ou `500`) | `''` |
 | Subir budget do chain | `CHAIN_BUDGET_SECONDS=10` | `5.0` |
 | Trip circuit mais cedo | `CB_FAILURE_THRESHOLD=3` | `5` |
 | Cooldown maior do breaker | `CB_COOLDOWN_SECONDS=60` | `30.0` |

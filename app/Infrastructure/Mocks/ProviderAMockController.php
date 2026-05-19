@@ -8,6 +8,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Symfony\Component\HttpFoundation\Response as HttpResponse;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 final class ProviderAMockController
 {
@@ -32,9 +33,20 @@ final class ProviderAMockController
         $fail = $request->query('fail');
 
         if ($fail === 'timeout') {
-            sleep(10);
-
-            return new JsonResponse(['ok' => true]);
+            // Sleep up to 10s but bail out as soon as the client aborts,
+            // so the worker isn't held hostage after a provider timeout.
+            return new StreamedResponse(function (): void {
+                ignore_user_abort(true);
+                for ($i = 0; $i < 100; $i++) {
+                    usleep(100_000); // 100ms
+                    echo ' ';
+                    @flush();
+                    if (connection_aborted()) {
+                        return;
+                    }
+                }
+                echo '{"ok":true}';
+            }, 200, ['Content-Type' => 'application/json']);
         }
 
         if ($fail === '500') {

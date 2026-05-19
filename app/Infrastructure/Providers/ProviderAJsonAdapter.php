@@ -33,6 +33,7 @@ final class ProviderAJsonAdapter implements DebtProvider
         private readonly int $timeoutSeconds = 2,
         private readonly int $retryAttempts = 3,
         private readonly int $retryBackoffMs = 100,
+        private readonly string $simulateFailure = '',
     ) {}
 
     public function fetchDebts(Plate $plate): array
@@ -55,7 +56,10 @@ final class ProviderAJsonAdapter implements DebtProvider
                     throw: false,
                 )
                 ->acceptJson()
-                ->get("{$this->baseUrl}/debts/{$plate->toString()}");
+                ->get(
+                    "{$this->baseUrl}/debts/{$plate->toString()}",
+                    $this->simulateFailure !== '' ? ['fail' => $this->simulateFailure] : [],
+                );
         } catch (ConnectionException $e) {
             throw new ProviderUnavailableException(
                 "Provider A unreachable: {$e->getMessage()}",

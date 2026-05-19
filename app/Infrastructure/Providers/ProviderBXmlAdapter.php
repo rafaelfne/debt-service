@@ -31,6 +31,7 @@ final class ProviderBXmlAdapter implements DebtProvider
         private readonly int $timeoutSeconds = 2,
         private readonly int $retryAttempts = 3,
         private readonly int $retryBackoffMs = 100,
+        private readonly string $simulateFailure = '',
     ) {}
 
     public function fetchDebts(Plate $plate): array
@@ -52,7 +53,10 @@ final class ProviderBXmlAdapter implements DebtProvider
                     throw: false,
                 )
                 ->withHeaders(['Accept' => 'application/xml'])
-                ->get("{$this->baseUrl}/debts/{$plate->toString()}");
+                ->get(
+                    "{$this->baseUrl}/debts/{$plate->toString()}",
+                    $this->simulateFailure !== '' ? ['fail' => $this->simulateFailure] : [],
+                );
         } catch (ConnectionException $e) {
             throw new ProviderUnavailableException(
                 "Provider B unreachable: {$e->getMessage()}",

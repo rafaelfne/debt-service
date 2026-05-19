@@ -43,12 +43,17 @@ return [
             'timeout' => (int) env('PROVIDER_A_TIMEOUT', 2),
             'retries' => (int) env('PROVIDER_A_RETRIES', 3),
             'backoff_ms' => (int) env('PROVIDER_A_BACKOFF_MS', 100),
+            // Demo-only: appends `?fail=<value>` to mock requests so the in-app
+            // mock (routes/web.php) can simulate `timeout` (sleep 10s) or `500`.
+            // Empty string disables it. Has no effect against real providers.
+            'fail' => (string) env('PROVIDER_A_FAIL', ''),
         ],
         'b' => [
             'url' => env('PROVIDER_B_URL'),
             'timeout' => (int) env('PROVIDER_B_TIMEOUT', 2),
             'retries' => (int) env('PROVIDER_B_RETRIES', 3),
             'backoff_ms' => (int) env('PROVIDER_B_BACKOFF_MS', 100),
+            'fail' => (string) env('PROVIDER_B_FAIL', ''),
         ],
     ],
 
