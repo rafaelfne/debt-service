@@ -48,6 +48,11 @@
         "post-root-package-install": [
             "@php -r \"file_exists('.env') || copy('.env.example', '.env');\""
         ],
+        "dev": [
+            "Composer\\Config::disableProcessTimeout",
+            "@putenv PHP_CLI_SERVER_WORKERS=4",
+            "@php artisan serve --no-reload"
+        ],
         "test": [
             "@php artisan config:clear --ansi",
             "@php vendor/bin/pest"

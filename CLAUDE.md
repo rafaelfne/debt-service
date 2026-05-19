@@ -16,7 +16,7 @@ composer test                              # 200 passed em ~3s
 composer test:coverage                     # gate 100% domain+application (precisa pcov)
 ./vendor/bin/pest --filter=Money           # filtra por nome de classe/teste
 ./vendor/bin/pint --test                   # checa estilo
-php artisan serve                          # API em :8000
+composer dev                               # API em :8000 com workers concorrentes (atende loopback dos mocks)
 ./docs/curls/happy-path.sh | jq            # canon do enunciado byte-a-byte
 ./docs/curls/invalid-plate.sh              # 422 validation_failed
 ./docs/curls/all-providers-down.sh         # 503 all_providers_unavailable (após ajustar .env)
@@ -288,11 +288,17 @@ composer test
 ./vendor/bin/pest --filter=IpvaInterestPolicy
 ./vendor/bin/pest --coverage
 
-# Rodar API local
-php artisan serve
+# Rodar API local — usa PHP_CLI_SERVER_WORKERS=4 + --no-reload para que o mesmo
+# servidor consiga atender o /api/debts/query e o loopback /mock/provider-a|b em
+# paralelo. Sem isso, o php artisan serve single-thread bloqueia a si mesmo e a
+# chain estoura o budget de 5s sem nunca tentar o Provider B.
+#
+# Atenção: o Laravel ServeCommand só respeita PHP_CLI_SERVER_WORKERS quando
+# --no-reload é passado (caso contrário, o wrapper de file-watching força 1 worker).
+composer dev
 
-# Subir mocks (depois da I6.1) — em outro terminal
-PROVIDER_A_URL=http://localhost:8000/mock/provider-a php artisan serve
+# Equivalente sem o wrapper composer:
+# PHP_CLI_SERVER_WORKERS=4 php artisan serve --no-reload
 
 # Request de exemplo (depois da I8.3)
 curl -X POST http://localhost:8000/api/debts/query \
