@@ -33,9 +33,15 @@ composer install
 cp .env.example .env
 php artisan key:generate
 
-# 3. Rodar a API
-php artisan serve
+# 3. Rodar a API (recomendado — server + queue + logs + vite em paralelo)
+composer dev
 # → http://localhost:8000
+# Sobe artisan serve com PHP_CLI_SERVER_WORKERS=4 (resolve concorrência
+# quando a API chama os mocks no mesmo host), queue:listen, pail (logs
+# em tempo real) e vite — tudo via npx concurrently.
+
+# Alternativa mínima (sem workers paralelos):
+php artisan serve
 ```
 
 Os mocks dos providers já estão registrados em `routes/web.php` (guardados por
