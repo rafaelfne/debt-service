@@ -8,7 +8,13 @@ use App\Domain\Money\Money;
 
 final class MultaInterestPolicy implements InterestPolicy
 {
-    private const DAILY_RATE = '0.01';
+    /**
+     * Default reflects the canon value from the enunciado (1%/day, no cap).
+     * String so it flows into Money/BigDecimal without float coercion.
+     */
+    public function __construct(
+        private readonly string $dailyRate = '0.01',
+    ) {}
 
     public function calculate(Money $original, int $daysOverdue): Money
     {
@@ -16,6 +22,6 @@ final class MultaInterestPolicy implements InterestPolicy
             return Money::zero();
         }
 
-        return $original->multiply(self::DAILY_RATE)->multiply((string) $daysOverdue);
+        return $original->multiply($this->dailyRate)->multiply((string) $daysOverdue);
     }
 }

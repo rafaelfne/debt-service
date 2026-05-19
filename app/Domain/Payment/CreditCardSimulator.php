@@ -9,9 +9,16 @@ use Brick\Math\BigDecimal;
 
 final class CreditCardSimulator
 {
-    private const MONTHLY_RATE = '0.025';
-
     private const INSTALLMENT_COUNTS = [1, 6, 12];
+
+    /**
+     * Default 0.025 is the canon 2.5%/month from the enunciado. The installment
+     * counts stay hardcoded because changing them breaks the byte-for-byte JSON
+     * contract — that's a structural change, not a knob.
+     */
+    public function __construct(
+        private readonly string $monthlyRate = '0.025',
+    ) {}
 
     public function simulate(Money $base): CreditCardPayment
     {
@@ -39,7 +46,7 @@ final class CreditCardSimulator
             return $base;
         }
 
-        $rate = BigDecimal::of(self::MONTHLY_RATE);
+        $rate = BigDecimal::of($this->monthlyRate);
         $factor = BigDecimal::of('1')->plus($rate)->power($count);  // (1+i)^n
         $denominator = $factor->minus(BigDecimal::of('1'));         // (1+i)^n − 1
 

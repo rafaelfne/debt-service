@@ -13,8 +13,11 @@ it('resolves PaymentSimulator from the container with both simulators wired', fu
     expect($simulator->simulate([])[0]->baseAmount->toString())->toBe('0.00');
 });
 
-it('binds PixSimulator and CreditCardSimulator as singletons', function (): void {
-    expect(app(PixSimulator::class))->toBe(app(PixSimulator::class))
-        ->and(app(CreditCardSimulator::class))->toBe(app(CreditCardSimulator::class))
+it('PixSimulator and CreditCardSimulator are transient (bind), PaymentSimulator is singleton', function (): void {
+    // Pix/CreditCard are bound transient so config overrides propagate per
+    // resolution (test-time config()->set or live `.env` swap). PaymentSimulator
+    // itself is stateless and stays a singleton.
+    expect(app(PixSimulator::class))->not->toBe(app(PixSimulator::class))
+        ->and(app(CreditCardSimulator::class))->not->toBe(app(CreditCardSimulator::class))
         ->and(app(PaymentSimulator::class))->toBe(app(PaymentSimulator::class));
 });
