@@ -8,9 +8,15 @@ use App\Domain\Money\Money;
 
 final class IpvaInterestPolicy implements InterestPolicy
 {
-    private const DAILY_RATE = '0.0033';
-
-    private const CAP_RATE = '0.20';
+    /**
+     * Both rates are strings (not floats) so they feed Money/BigDecimal directly
+     * without round-tripping through PHP float — invariante #1 do CLAUDE.md.
+     * Defaults reflect the canon values from the enunciado.
+     */
+    public function __construct(
+        private readonly string $dailyRate = '0.0033',
+        private readonly string $capRate = '0.20',
+    ) {}
 
     public function calculate(Money $original, int $daysOverdue): Money
     {
@@ -18,8 +24,8 @@ final class IpvaInterestPolicy implements InterestPolicy
             return Money::zero();
         }
 
-        $raw = $original->multiply(self::DAILY_RATE)->multiply((string) $daysOverdue);
-        $cap = $original->multiply(self::CAP_RATE);
+        $raw = $original->multiply($this->dailyRate)->multiply((string) $daysOverdue);
+        $cap = $original->multiply($this->capRate);
 
         return Money::min($raw, $cap);
     }

@@ -22,10 +22,27 @@ php artisan serve                          # API em :8000
 ./docs/curls/all-providers-down.sh         # 503 all_providers_unavailable (após ajustar .env)
 ```
 
-**Pontos pra abrir primeiro quando o avaliador pedir uma mudança:**
-- Adicionar tipo de débito → §7.2 deste arquivo
-- Adicionar provider → §7.1
-- Trocar taxa de juros → §7.4
+**Mudanças rápidas via `.env` (edit + restart, sem refactor):**
+
+| Pedido típico do avaliador | Env var | Default |
+|---|---|---|
+| Trocar IPVA pra X%/dia | `IPVA_DAILY_RATE=0.005` | `0.0033` |
+| Mudar teto do IPVA pra X% | `IPVA_CAP_RATE=0.15` | `0.20` |
+| MULTA a X%/dia | `MULTA_DAILY_RATE=0.02` | `0.01` |
+| Pix com X% de desconto | `PIX_DISCOUNT_FACTOR=0.90` | `0.95` |
+| Cartão a X% a.m. | `CC_MONTHLY_RATE=0.03` | `0.025` |
+| Aumentar timeout do provider | `PROVIDER_A_TIMEOUT=5` | `2` |
+| Subir budget do chain | `CHAIN_BUDGET_SECONDS=10` | `5.0` |
+| Trip circuit mais cedo | `CB_FAILURE_THRESHOLD=3` | `5` |
+| Cooldown maior do breaker | `CB_COOLDOWN_SECONDS=60` | `30.0` |
+| Body limit maior | `HTTP_MAX_BODY_BYTES=2097152` | `1048576` |
+
+Tudo passa por `config/business.php`. `php artisan config:clear && php artisan serve` aplica.
+
+**Pontos pra abrir primeiro quando o avaliador pedir uma mudança ESTRUTURAL:**
+- Adicionar tipo de débito → §7.2 deste arquivo (nova `InterestPolicy`)
+- Adicionar provider → §7.1 (novo adapter)
+- Adicionar forma de pagamento → §7.3 (novo simulator)
 - Mudar shape do JSON de saída → `app/Infrastructure/Http/Resources/DebtResponseResource.php`
 - Mudar validação da placa → `app/Domain/Plate/Plate.php` (regex em `PATTERN`); `PlateRule` herda automaticamente
 
@@ -75,15 +92,17 @@ app/
 
 ## 3. Regras de domínio
 
+> Todas as taxas e tetos abaixo são **defaults** carregados de `config/business.php`. Para overridar em runtime (demo), use as env vars listadas na §0. Mudar a *regra* (ex: tipo de débito novo) ainda exige código — §7.
+
 ### Tipos de débito
 - **Fechado**: apenas `IPVA` e `MULTA`. Qualquer tipo desconhecido lança `UnknownDebtTypeException` → HTTP 422. **Não** mapear para "OUTROS".
 
 ### Cálculo de juros (calculado sobre `valor_original`, retorna **juros**, não total)
 
-| Tipo | Taxa | Teto |
-|---|---|---|
-| `IPVA` | 0,33% ao dia | 20% sobre o **juro** (não sobre o total) |
-| `MULTA` | 1% ao dia | sem teto |
+| Tipo | Taxa default | Teto default | Env var |
+|---|---|---|---|
+| `IPVA` | 0,33% ao dia | 20% sobre o **juro** (não sobre o total) | `IPVA_DAILY_RATE`, `IPVA_CAP_RATE` |
+| `MULTA` | 1% ao dia | sem teto | `MULTA_DAILY_RATE` |
 
 - `daysOverdue <= 0` → juros = `Money::zero()`
 - Fórmula IPVA: `juros = min(valor × 0.0033 × dias, valor × 0.20)`
@@ -337,6 +356,7 @@ php artisan route:list
 | 8 | Exceptions de domínio + handler central | Controllers ficam minimalistas |
 | 9 | Monolog processor global para mask | LGPD por construção, não opt-in |
 | 10 | Resposta JSON com valores como **string** | Precisão preservada na rede |
+| 11 | 14 knobs runtime em `config/business.php` + `.env` overrides | Demo-friendly: trocar taxa de juros, desconto Pix, timeout, threshold do breaker etc. é edit em 1 linha + restart. Defaults canônicos preservam byte-a-byte do enunciado. Mudanças *estruturais* (novo tipo, novo provider) ainda exigem código — §7. |
 
 ---
 

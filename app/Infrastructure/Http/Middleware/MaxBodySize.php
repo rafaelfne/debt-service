@@ -22,7 +22,10 @@ final class MaxBodySize
 
     public function handle(Request $request, Closure $next, ?int $maxBytes = null): Response
     {
-        $limit = $maxBytes ?? self::DEFAULT_MAX_BYTES;
+        // Explicit middleware param wins; otherwise read from business config
+        // (which itself falls back to the canon 1 MiB default).
+        $limit = $maxBytes
+            ?? (int) config('business.http.max_body_bytes', self::DEFAULT_MAX_BYTES);
 
         $declared = (int) ($request->headers->get('Content-Length') ?? 0);
         $size = $declared > 0 ? $declared : strlen((string) $request->getContent());
