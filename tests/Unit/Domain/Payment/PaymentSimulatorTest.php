@@ -29,7 +29,7 @@ function makeUpdatedDebt(DebtType $type, string $original, string $updated): Upd
 
 it('canon ENUNCIADO: [IPVA 1800.00, MULTA 555.93] → [TOTAL 2355.93, SOMENTE_IPVA 1800.00, SOMENTE_MULTA 555.93]', function (): void {
     $debts = [
-        makeUpdatedDebt(DebtType::IPVA, '1500.00', '1800.00'),
+        makeUpdatedDebt(DebtType::IPVA, '1500.33', '1800.00'),
         makeUpdatedDebt(DebtType::MULTA, '300.50', '555.93'),
     ];
 
@@ -54,9 +54,9 @@ it('canon DOIS DO MESMO TIPO: [IPVA 1000, IPVA 500] → [TOTAL 1500, SOMENTE_IPV
 
     expect($options)->toHaveCount(2);
     expect($options[0]->type)->toBe('TOTAL');
-    expect($options[0]->baseAmount->toString())->toBe('1500.00');
+    expect($options[0]->baseAmount->toString())->toBe('1500.33');
     expect($options[1]->type)->toBe('SOMENTE_IPVA');
-    expect($options[1]->baseAmount->toString())->toBe('1500.00');
+    expect($options[1]->baseAmount->toString())->toBe('1500.33');
 });
 
 it('preserves first-seen order of distinct types in SOMENTE_ options', function (): void {

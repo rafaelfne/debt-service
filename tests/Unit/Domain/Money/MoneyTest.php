@@ -7,7 +7,7 @@ use Brick\Math\BigDecimal;
 use Brick\Math\Exception\NumberFormatException;
 
 it('builds from a decimal string and renders 2-scale HALF_UP', function (): void {
-    expect(Money::of('1500.00')->toString())->toBe('1500.00');
+    expect(Money::of('1500.33')->toString())->toBe('1500.33');
 });
 
 it('rounds the third decimal place HALF_UP at toString', function (): void {
@@ -16,7 +16,7 @@ it('rounds the third decimal place HALF_UP at toString', function (): void {
 
 it('keeps full precision internally and rounds only on output', function (): void {
     expect(
-        Money::of('1500.00')->multiply('0.20')->equals(Money::of('300.00'))
+        Money::of('1500.33')->multiply('0.20')->equals(Money::of('300.00'))
     )->toBeTrue();
 });
 
@@ -38,7 +38,7 @@ it('multiplies by a string factor', function (): void {
 });
 
 it('multiplies by a BigDecimal factor', function (): void {
-    expect(Money::of('1000.00')->multiply(BigDecimal::of('1.5'))->toString())->toBe('1500.00');
+    expect(Money::of('1000.00')->multiply(BigDecimal::of('1.5'))->toString())->toBe('1500.33');
 });
 
 it('divides by a string divisor with HALF_UP rounding', function (): void {
@@ -88,7 +88,7 @@ it('serializes to JSON as the formatted string', function (): void {
 });
 
 it('rejects float construction', function (): void {
-    Money::of(1500.00);
+    Money::of(1500.33);
 })->throws(InvalidArgumentException::class);
 
 it('rejects int construction', function (): void {

@@ -14,7 +14,7 @@ final class Money implements JsonSerializable
     private function __construct(private readonly BigDecimal $amount) {}
 
     /**
-     * Build a Money from a decimal string (e.g. "1500.00", "0.33").
+     * Build a Money from a decimal string (e.g. "1500.33", "0.33").
      *
      * The union accepts int/float at the type level so float arguments reach the body
      * instead of triggering a TypeError; they are then explicitly rejected to

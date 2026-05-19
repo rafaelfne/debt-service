@@ -14,12 +14,12 @@ function utc(string $date): DateTimeImmutable
 it('exposes type, originalAmount and dueDate as readonly properties', function (): void {
     $debt = new Debt(
         type: DebtType::IPVA,
-        originalAmount: Money::of('1500.00'),
+        originalAmount: Money::of('1500.33'),
         dueDate: utc('2024-01-10T00:00:00Z'),
     );
 
     expect($debt->type)->toBe(DebtType::IPVA)
-        ->and($debt->originalAmount->equals(Money::of('1500.00')))->toBeTrue()
+        ->and($debt->originalAmount->equals(Money::of('1500.33')))->toBeTrue()
         ->and($debt->dueDate->format('Y-m-d'))->toBe('2024-01-10');
 });
 
@@ -36,7 +36,7 @@ it('returns 0 days overdue when the reference equals the due date', function ():
 });
 
 it('returns the IPVA canon: 121 days overdue against 2024-05-10', function (): void {
-    $debt = new Debt(DebtType::IPVA, Money::of('1500.00'), utc('2024-01-10T00:00:00Z'));
+    $debt = new Debt(DebtType::IPVA, Money::of('1500.33'), utc('2024-01-10T00:00:00Z'));
 
     expect($debt->daysOverdue(utc('2024-05-10T00:00:00Z')))->toBe(121);
 });

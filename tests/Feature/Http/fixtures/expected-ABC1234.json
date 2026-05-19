@@ -3,7 +3,7 @@
     "debitos": [
         {
             "tipo": "IPVA",
-            "valor_original": "1500.00",
+            "valor_original": "1500.33",
             "valor_atualizado": "1800.00",
             "vencimento": "2024-01-10",
             "dias_atraso": 121

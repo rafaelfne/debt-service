@@ -29,7 +29,7 @@ it('parses the canonical XML into a list of Debt VOs', function (): void {
         <response>
             <plate>ABC1234</plate>
             <debts>
-                <debt><type>IPVA</type><amount>1500.00</amount><due_date>2024-01-10</due_date></debt>
+                <debt><type>IPVA</type><amount>1500.33</amount><due_date>2024-01-10</due_date></debt>
                 <debt><type>MULTA</type><amount>300.50</amount><due_date>2024-02-15</due_date></debt>
             </debts>
         </response>
@@ -41,7 +41,7 @@ it('parses the canonical XML into a list of Debt VOs', function (): void {
 
     expect($debts)->toHaveCount(2);
     expect($debts[0]->type)->toBe(DebtType::IPVA)
-        ->and($debts[0]->originalAmount->toString())->toBe('1500.00')
+        ->and($debts[0]->originalAmount->toString())->toBe('1500.33')
         ->and($debts[0]->dueDate->format('Y-m-d'))->toBe('2024-01-10');
     expect($debts[1]->type)->toBe(DebtType::MULTA)
         ->and($debts[1]->originalAmount->toString())->toBe('300.50')

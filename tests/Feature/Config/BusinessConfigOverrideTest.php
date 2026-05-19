@@ -36,7 +36,7 @@ it('IpvaInterestPolicy honours an overridden cap_rate', function (): void {
     $policy = app(IpvaInterestPolicy::class);
 
     // 1500 × 0.0033 × 121 = 598.95 raw; cap = 1500 × 0.10 = 150 → returns 150
-    expect($policy->calculate(Money::of('1500.00'), 121)->toString())->toBe('150.00');
+    expect($policy->calculate(Money::of('1500.33'), 121)->toString())->toBe('150.00');
 });
 
 it('MultaInterestPolicy reflects an overridden daily_rate (2%/day)', function (): void {

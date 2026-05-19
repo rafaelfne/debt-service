@@ -357,7 +357,7 @@ php artisan route:list
 7. **`UnknownDebtTypeException` acionando fallback** na `ProviderChain`. Não — exceptions de domínio propagam direto, só `ProviderUnavailableException` aciona fallback.
 8. **Timezone do `DateTimeImmutable`** sem normalizar para UTC. Off-by-one nos dias em atraso.
 9. **Lista vazia de débitos** retornando `[TOTAL R$ 0]` ou `[]` sem decisão. Documentar antes da I5.3.
-10. **Body do JSON com campo monetário como número** (`"valor": 1500.00`) em vez de string (`"valor": "1500.00"`). Verificar com `is_string` no teste de byte-a-byte.
+10. **Body do JSON com campo monetário como número** (`"valor": 1500.33`) em vez de string (`"valor": "1500.33"`). Verificar com `is_string` no teste de byte-a-byte.
 11. **`TapPlateMasking` com type-hint apertado em `Monolog\Logger`.** O `LogManager::tap` do Laravel envolve o `Monolog\Logger` num `Illuminate\Log\Logger` antes de chamar o tap — type-hint estrito quebra em runtime, é silenciosamente capturado pelo try/catch interno do `LogManager::get`, e cai num emergency logger para `storage/logs/laravel.log`. Resultado: o processor de masking **nunca roda**, violando a invariante #8. Aceitar `Monolog\Logger | Illuminate\Log\Logger` no `__invoke` e desempacotar via `getLogger()`.
 12. **ANSI codes no `[demo]` sendo descartados pelo `ServeCommand`.** O Laravel filtra stderr dos workers: linhas começando com `[` têm prefixo até `] ` stripado, depois tudo é envolvido em `<fg=gray>`. Solução: (a) não usar prefix `[label]` no formatter, (b) prefixar cada mensagem com `\033[0m` para neutralizar o gray, (c) injetar SGR codes inline nos tokens que devem destacar.
 

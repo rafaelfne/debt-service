@@ -159,7 +159,7 @@ Output esperado (resumido):
 {
   "placa": "ABC1234",
   "debitos": [
-    { "tipo": "IPVA",  "valor_original": "1500.00", "valor_atualizado": "1800.00", "vencimento": "2024-01-10", "dias_atraso": 121 },
+    { "tipo": "IPVA",  "valor_original": "1500.33", "valor_atualizado": "1800.00", "vencimento": "2024-01-10", "dias_atraso": 121 },
     { "tipo": "MULTA", "valor_original": "300.50",  "valor_atualizado": "555.93",  "vencimento": "2024-02-15", "dias_atraso": 85 }
   ],
   "resumo": { "total_original": "1800.50", "total_atualizado": "2355.93" },
@@ -274,7 +274,7 @@ sequenceDiagram
 | # | Decisão | Justificativa |
 |---|---|---|
 | 1 | `brick/math` para precisão monetária | Domain-grade `BigDecimal`, sem float interno. Pinado em `^0.14` por compatibilidade com Laravel 12 — a API de soma/multiplicação/arredondamento HALF_UP é estável nesse range. |
-| 2 | `pcrov/jsonreader` (com `FLOATS_AS_STRINGS`) para Provider A | Streaming, preserva tokens decimais raw quando a flag está setada — evita o cast nativo para `float` que corromperia `1500.00`. |
+| 2 | `pcrov/jsonreader` (com `FLOATS_AS_STRINGS`) para Provider A | Streaming, preserva tokens decimais raw quando a flag está setada — evita o cast nativo para `float` que corromperia `1500.33`. |
 | 3 | SimpleXML + cast `(string)` para Provider B | Built-in, sem libs extras. Cast explícito garante que valores nunca passem por `float`. |
 | 4 | Hexagonal em 3 camadas | Testabilidade do domínio + isolamento de Laravel. Permite trocar providers ou expor o use case por CLI sem mexer no core. |
 | 5 | Pest 3 como framework de testes | Sintaxe declarativa, integração com Laravel, suporte a fakes/mocks. |
@@ -282,7 +282,7 @@ sequenceDiagram
 | 7 | Circuit Breaker in-memory simples | Suficiente para single-instance. Estado por chave de provider, com `open`/`closed` e cooldown. Cluster fica como melhoria futura. |
 | 8 | Exceptions de domínio + handler central | Controllers ficam minimalistas; a hierarquia `DomainException` mapeia 1:1 para códigos HTTP no handler. |
 | 9 | Monolog processor global para mask de placa | LGPD por construção (não opt-in). Mesmo logs de exceção saem mascarados. |
-| 10 | Resposta JSON com valores monetários como **string** (`"1500.00"`) | Precisão preservada na rede. Cliente decide parsing. Evita perda de casas em JSON.parse JS. |
+| 10 | Resposta JSON com valores monetários como **string** (`"1500.33"`) | Precisão preservada na rede. Cliente decide parsing. Evita perda de casas em JSON.parse JS. |
 | 11 | Demo tracer via port `QueryTracer` + adapter `DemoLogger` | Application depende da porta, não da implementação. ANSI inline porque o `ServeCommand` do Laravel força `<fg=gray>` no stderr dos workers — codes raw sobrevivem ao wrap. No-op em produção via flag no construtor. |
 
 ---

@@ -27,7 +27,7 @@ function calculatorWithFullPolicies(): InterestCalculator
 it('returns an UpdatedDebt VO with the right shape', function (): void {
     $debt = new Debt(
         DebtType::IPVA,
-        Money::of('1500.00'),
+        Money::of('1500.33'),
         new DateTimeImmutable('2024-01-10T00:00:00Z', new DateTimeZone('UTC')),
     );
 
@@ -36,13 +36,13 @@ it('returns an UpdatedDebt VO with the right shape', function (): void {
     expect($result)->toBeInstanceOf(UpdatedDebt::class)
         ->and($result->type)->toBe(DebtType::IPVA)
         ->and($result->daysOverdue)->toBe(121)
-        ->and($result->originalAmount->toString())->toBe('1500.00');
+        ->and($result->originalAmount->toString())->toBe('1500.33');
 });
 
-it('canon IPVA: 1500.00 due 2024-01-10, ref 2024-05-10 → updated 1800.00', function (): void {
+it('canon IPVA: 1500.33 due 2024-01-10, ref 2024-05-10 → updated 1800.00', function (): void {
     $debt = new Debt(
         DebtType::IPVA,
-        Money::of('1500.00'),
+        Money::of('1500.33'),
         new DateTimeImmutable('2024-01-10T00:00:00Z', new DateTimeZone('UTC')),
     );
 
@@ -70,7 +70,7 @@ it('canon COMBINED: IPVA + MULTA → 1800.00 + 555.93 = 2355.93', function (): v
     $debts = [
         new Debt(
             DebtType::IPVA,
-            Money::of('1500.00'),
+            Money::of('1500.33'),
             new DateTimeImmutable('2024-01-10T00:00:00Z', new DateTimeZone('UTC')),
         ),
         new Debt(

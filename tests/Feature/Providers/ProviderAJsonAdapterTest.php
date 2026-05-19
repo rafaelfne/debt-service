@@ -22,7 +22,7 @@ it('parses the canonical JSON response into a list of Debt VOs', function (): vo
         PROVIDER_A_URL.'/debts/ABC1234' => Http::response([
             'plate' => 'ABC1234',
             'debts' => [
-                ['type' => 'IPVA',  'amount' => '1500.00', 'due_date' => '2024-01-10'],
+                ['type' => 'IPVA',  'amount' => '1500.33', 'due_date' => '2024-01-10'],
                 ['type' => 'MULTA', 'amount' => '300.50',  'due_date' => '2024-02-15'],
             ],
         ]),
@@ -32,7 +32,7 @@ it('parses the canonical JSON response into a list of Debt VOs', function (): vo
 
     expect($debts)->toHaveCount(2);
     expect($debts[0]->type)->toBe(DebtType::IPVA)
-        ->and($debts[0]->originalAmount->toString())->toBe('1500.00')
+        ->and($debts[0]->originalAmount->toString())->toBe('1500.33')
         ->and($debts[0]->dueDate->format('Y-m-d'))->toBe('2024-01-10');
     expect($debts[1]->type)->toBe(DebtType::MULTA)
         ->and($debts[1]->originalAmount->toString())->toBe('300.50')

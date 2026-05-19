@@ -12,7 +12,7 @@ use DateTimeZone;
 
 /**
  * Canonical debts from the enunciado, anchored to the reference date 2024-05-10:
- *   - IPVA 1500.00 due 2024-01-10 (121 days overdue → updated 1800.00)
+ *   - IPVA 1500.33 due 2024-01-10 (121 days overdue → updated 1800.00)
  *   - MULTA 300.50 due 2024-02-15 (85 days overdue → updated 555.93)
  */
 final class DebtFixtures
@@ -23,7 +23,7 @@ final class DebtFixtures
     {
         return new Debt(
             type: DebtType::IPVA,
-            originalAmount: Money::of('1500.00'),
+            originalAmount: Money::of('1500.33'),
             dueDate: self::utc('2024-01-10T00:00:00Z'),
         );
     }

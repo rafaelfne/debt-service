@@ -11,7 +11,7 @@ it('Provider A mock returns the canonical JSON for ABC1234', function (): void {
     $decoded = $response->json();
     expect($decoded['plate'])->toBe('ABC1234')
         ->and($decoded['debts'])->toHaveCount(2)
-        ->and($decoded['debts'][0])->toBe(['type' => 'IPVA', 'amount' => '1500.00', 'due_date' => '2024-01-10'])
+        ->and($decoded['debts'][0])->toBe(['type' => 'IPVA', 'amount' => '1500.33', 'due_date' => '2024-01-10'])
         ->and($decoded['debts'][1])->toBe(['type' => 'MULTA', 'amount' => '300.50', 'due_date' => '2024-02-15']);
 });
 
@@ -27,7 +27,7 @@ it('Provider B mock returns the canonical XML for ABC1234', function (): void {
     $debts = $xml->debts->debt;
     expect(iterator_count($debts))->toBe(2)
         ->and((string) $debts[0]->type)->toBe('IPVA')
-        ->and((string) $debts[0]->amount)->toBe('1500.00')
+        ->and((string) $debts[0]->amount)->toBe('1500.33')
         ->and((string) $debts[0]->due_date)->toBe('2024-01-10');
 });
 
