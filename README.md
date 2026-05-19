@@ -15,12 +15,15 @@ API HTTP em PHP/Laravel que recebe uma placa veicular, consulta dois providers e
 - **Precisão monetária:** `brick/math` (`BigDecimal`) de ponta a ponta. Nenhum `float` em
   código de domínio ou adapters.
 - **Resiliência:** chain sequencial de providers (JSON → XML), retry com backoff em
-  `ConnectionException`/5xx, circuit breaker in-memory por provider.
+  `ConnectionException`/5xx, circuit breaker in-memory por provider, budget global de 5s.
 - **LGPD:** placas mascaradas em todo log via processor global do Monolog.
+- **Cobertura:** 200 testes Pest / 421 assertions, gate de **100% no Domain + Application** no CI.
 
 ---
 
 ## Como rodar
+
+### Setup local (Composer + PHP 8.2+)
 
 ```bash
 # 1. Clonar e instalar dependências
@@ -33,24 +36,40 @@ php artisan key:generate
 # 3. Rodar a API
 php artisan serve
 # → http://localhost:8000
+```
 
-# 4. (Opcional) Subir os mocks de provider em outro terminal
-php artisan serve --port=8001
-# Aponte PROVIDER_A_URL e PROVIDER_B_URL para http://localhost:8001/mock/...
+Os mocks dos providers já estão registrados em `routes/web.php` (guardados por
+`! app()->isProduction()`), apontados pelas variáveis `PROVIDER_A_URL` e `PROVIDER_B_URL`
+do `.env.example`. **Não precisa subir nada extra** para testar end-to-end:
+
+```bash
+curl -s http://localhost:8000/mock/provider-a/debts/ABC1234 | jq
+curl -s http://localhost:8000/mock/provider-b/debts/ABC1234
+```
+
+### Setup com Docker (alternativa)
+
+Não há `Dockerfile` no repo ainda. Para containerizar:
+
+```dockerfile
+FROM php:8.3-cli-alpine
+COPY . /app
+WORKDIR /app
+RUN composer install --no-dev --optimize-autoloader
+CMD ["php", "artisan", "serve", "--host=0.0.0.0", "--port=8000"]
 ```
 
 ### Rodar os testes
 
 ```bash
-composer test                       # roda Pest
+composer test                       # 200 passed (421 assertions) — Pest
 composer test:coverage              # exige 100% no app/Domain + app/Application (precisa de Xdebug/PCOV)
-./vendor/bin/pest --filter=...      # filtra um teste específico
+./vendor/bin/pest --filter=Money    # filtra um teste específico
+./vendor/bin/pint --test            # checa estilo (Laravel Pint)
 ```
 
-> O CI mantém um gate de **100% de cobertura** em `app/Domain/` e `app/Application/` (job
-> `coverage` em `.github/workflows/ci.yml`). Infrastructure é fora do escopo do gate por
-> agora — adapters de provider serão avaliados por testes de contrato (I6.x), não por
-> percentual de linha.
+O CI (`.github/workflows/ci.yml`) roda matriz PHP 8.2 + 8.3, Pint dry-run, e gate de
+cobertura **100% em Domain + Application** em todo PR.
 
 ---
 
@@ -61,17 +80,80 @@ composer test:coverage              # exige 100% no app/Domain + app/Application
 | `POST` | `/api/debts/query` | Consulta débitos de uma placa e devolve simulações de pagamento. |
 | `GET` | `/api/health` | Health check (smoke). |
 | `GET` | `/up` | Health check default do Laravel. |
+| `GET` | `/mock/provider-a/debts/{plate}` | Mock JSON (dev/test only). |
+| `GET` | `/mock/provider-b/debts/{plate}` | Mock XML (dev/test only). |
 
-> Os endpoints `POST /api/debts/query` e mocks de provider serão implementados nos épicos
-> 6 e 8.
+### Mapa de status
 
-### Exemplo (após I8.3)
+| Status | Quando | Body |
+|---|---|---|
+| `200` | Happy path | Envelope canônico (`placa`, `debitos`, `resumo`, `pagamentos`) |
+| `400` | `InvalidPlateException` fora do FormRequest | `{"error":"invalid_plate"}` |
+| `413` | Body > 1 MiB | `{"error":"payload_too_large","max_bytes":...,"received_bytes":...}` |
+| `422` | Validação do `placa` falhou | `{"error":"validation_failed","errors":{...}}` |
+| `422` | Campos extras no body | `{"error":"unknown_fields","unknown_fields":[...]}` |
+| `422` | Provider retornou tipo desconhecido | `{"error":"unknown_debt_type","type":"..."}` |
+| `503` | Todos os providers indisponíveis | `{"error":"all_providers_unavailable"}` |
 
+### Exemplos de uso (cURL)
+
+#### Happy path
 ```bash
 curl -X POST http://localhost:8000/api/debts/query \
   -H 'Content-Type: application/json' \
-  -d '{"placa":"ABC1234"}'
+  -d '{"placa":"ABC1234"}' | jq
 ```
+
+Output esperado (resumido):
+```json
+{
+  "placa": "ABC1234",
+  "debitos": [
+    { "tipo": "IPVA",  "valor_original": "1500.00", "valor_atualizado": "1800.00", "vencimento": "2024-01-10", "dias_atraso": 121 },
+    { "tipo": "MULTA", "valor_original": "300.50",  "valor_atualizado": "555.93",  "vencimento": "2024-02-15", "dias_atraso": 85 }
+  ],
+  "resumo": { "total_original": "1800.50", "total_atualizado": "2355.93" },
+  "pagamentos": {
+    "opcoes": [
+      { "tipo": "TOTAL",         "valor_base": "2355.93", "pix": { "total_com_desconto": "2238.13" }, "cartao_credito": { "parcelas": [ {"quantidade":1,"valor_parcela":"2355.93"}, {"quantidade":6,"valor_parcela":"427.72"}, {"quantidade":12,"valor_parcela":"229.67"} ] } },
+      { "tipo": "SOMENTE_IPVA",  "valor_base": "1800.00", "pix": { "total_com_desconto": "1710.00" }, "cartao_credito": { "parcelas": [ {"quantidade":1,"valor_parcela":"1800.00"}, {"quantidade":6,"valor_parcela":"326.79"}, {"quantidade":12,"valor_parcela":"175.48"} ] } },
+      { "tipo": "SOMENTE_MULTA", "valor_base": "555.93",  "pix": { "total_com_desconto": "528.13" },  "cartao_credito": { "parcelas": [ {"quantidade":1,"valor_parcela":"555.93"},  {"quantidade":6,"valor_parcela":"100.93"}, {"quantidade":12,"valor_parcela":"54.20"}  ] } }
+    ]
+  }
+}
+```
+
+#### Placa inválida → 422
+```bash
+curl -i -X POST http://localhost:8000/api/debts/query \
+  -H 'Content-Type: application/json' \
+  -d '{"placa":"INVALID"}'
+
+# HTTP/1.1 422 Unprocessable Entity
+# {"error":"validation_failed","errors":{"placa":["The placa must be a valid Brazilian plate (ABC1234 or ABC1D23)."]}}
+```
+
+#### Campo extra → 422
+```bash
+curl -i -X POST http://localhost:8000/api/debts/query \
+  -H 'Content-Type: application/json' \
+  -d '{"placa":"ABC1234","extra":"noise"}'
+
+# HTTP/1.1 422 Unprocessable Entity
+# {"error":"unknown_fields","unknown_fields":["extra"]}
+```
+
+#### Body grande demais → 413
+```bash
+curl -i -X POST http://localhost:8000/api/debts/query \
+  -H 'Content-Type: application/json' \
+  -d "$(printf '{"placa":"ABC1234","noise":"%*s"}' 1048600 x)"
+
+# HTTP/1.1 413 Payload Too Large
+# {"error":"payload_too_large","max_bytes":1048576,"received_bytes":1048622}
+```
+
+Scripts prontos em [`docs/curls/`](docs/curls).
 
 ---
 
@@ -80,14 +162,60 @@ curl -X POST http://localhost:8000/api/debts/query \
 ```
 app/
 ├── Domain/           # Regras de negócio puras. Sem Laravel, sem HTTP.
+│   ├── Money/        # BigDecimal wrapper (precisão decimal)
+│   ├── Plate/        # VO + masking LGPD
+│   ├── Debt/         # DebtType, Debt, InterestPolicy + Calculator
+│   ├── Payment/      # PixSimulator, CreditCardSimulator, PaymentSimulator
+│   └── Exceptions/   # DomainException base
 ├── Application/      # Use cases + ports. Orquestra Domain.
+│   ├── Ports/        # DebtProvider (interface)
+│   └── UseCases/     # QueryDebtsUseCase + VOs de resultado
 └── Infrastructure/   # Adapters (Http, Providers, Resilience, Logging).
+    ├── Http/         # Controllers, Requests, Resources, Rules, Middleware
+    ├── Providers/    # ProviderAJsonAdapter (pcrov), ProviderBXmlAdapter (SimpleXML)
+    ├── Resilience/   # ProviderChain + CircuitBreaker + CircuitBreakerDebtProvider
+    ├── Logging/      # PlateMaskingProcessor + TapPlateMasking
+    └── Mocks/        # ProviderAMockController, ProviderBMockController + fixtures
 ```
 
 Dependências apontam **somente para dentro**: Infrastructure conhece Application e Domain;
 Application conhece Domain; Domain não conhece ninguém.
 
-> Diagrama de fluxo: _placeholder, adicionar quando os adapters estiverem prontos (I6.5)_.
+### Fluxo de uma requisição
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Client
+    participant Controller as DebtsController
+    participant UseCase as QueryDebtsUseCase
+    participant Chain as ProviderChain
+    participant CB_A as CircuitBreaker(A)
+    participant Adapter_A as ProviderAJsonAdapter
+    participant Calc as InterestCalculator
+    participant Sim as PaymentSimulator
+    participant Resource as DebtResponseResource
+
+    Client->>Controller: POST /api/debts/query {"placa":"ABC1234"}
+    Note right of Controller: QueryDebtsRequest valida (PlateRule + MaxBodySize)
+    Controller->>UseCase: execute(Plate)
+    UseCase->>Chain: fetchDebts(Plate)
+    Chain->>CB_A: fetchDebts(Plate)
+    CB_A->>Adapter_A: fetchDebts(Plate)
+    Adapter_A-->>CB_A: list<Debt>
+    CB_A-->>Chain: list<Debt>
+    Chain-->>UseCase: list<Debt>
+    UseCase->>Calc: calculate(Debt) por item
+    Calc-->>UseCase: list<UpdatedDebt>
+    UseCase->>Sim: simulate(list<UpdatedDebt>)
+    Sim-->>UseCase: list<PaymentOption>
+    UseCase-->>Controller: DebtQueryResult
+    Controller->>Resource: new (DebtQueryResult)
+    Resource-->>Client: JSON 200 (envelope canônico)
+```
+
+> Quando A falha: `Chain` faz fallback pra `CB_B → ProviderBXmlAdapter`. Quando ambos
+> falham: `AllProvidersUnavailableException` → handler central → HTTP 503.
 
 ---
 
@@ -130,6 +258,26 @@ A alternativa "consenso" fica como melhoria futura, exigindo regra explícita de
 
 ---
 
+## Divergências do enunciado
+
+Documentadas para evitar surpresa na avaliação:
+
+1. **`brick/math` em `^0.14`**, não `^0.17.1` como sugeria a issue I1.3. Laravel 12 ainda
+   não declara compat com brick/math 0.15+ — o `composer install` quebra. A API que
+   usamos (`BigDecimal::of`, `plus`, `minus`, `multipliedBy`, `dividedBy`, `power`,
+   `toScale`) é estável no range 0.11→0.14, então não impacta domínio. Documentado em
+   PR #50 e na tabela de decisões #1.
+2. **Shape do contrato dos providers em inglês snake_case** (`{type, amount, due_date}`),
+   enquanto a **saída da nossa API** é em PT-BR snake_case (`{tipo, valor_original,
+   valor_atualizado, vencimento}`). Os adapters fazem o mapeamento. Decisão tomada no
+   gate da Feature 6 — separa contratos externos (que poderiam vir de fornecedores
+   internacionais) do shape PT-BR da entrega final.
+3. **Lista vazia de débitos retorna `200` com `pagamentos.opcoes: [TOTAL=0.00]`**, não
+   `204`. A placa existe, só não tem débitos. Trade-off: o array `opcoes` nunca volta
+   vazio, o que facilita o consumidor mas custa ~50 bytes a mais. Documentado no PR #73.
+
+---
+
 ## Trade-offs e melhorias futuras
 
 - **Persistência:** nenhuma. Cada request consulta os providers do zero. Adicionar cache
@@ -144,12 +292,8 @@ A alternativa "consenso" fica como melhoria futura, exigindo regra explícita de
   evolução natural. CLAUDE.md §11 #7 documenta a decisão.
 - **Tipos de débito:** apenas `IPVA` e `MULTA`. Adicionar `LICENCIAMENTO` é uma nova
   `InterestPolicy` + registro no service provider (guia em `CLAUDE.md` §7).
-- **Resposta para lista vazia:** quando o provider retorna `[]`, o `QueryDebtsUseCase`
-  emite `debitos: []`, `resumo` zerado (`total_original`/`total_atualizado = "0.00"`) e
-  uma única opção `TOTAL` com `valor_base = "0.00"`. HTTP 200, não 204 — a placa existe,
-  só não tem débitos. Trade-off: o array `pagamentos.opcoes` nunca volta vazio, o que
-  facilita o consumidor mas custa ~50 bytes a mais. Pode ser revisado em I8.5 se o
-  enunciado pedir 204.
+- **Resposta para lista vazia:** HTTP 200 com `[TOTAL=0.00]` (ver "Divergências do
+  enunciado" acima).
 - **Observabilidade:** logs estruturados com placa mascarada. Métricas/tracing
   (OpenTelemetry) ficam para uma issue dedicada.
 - **Frontend:** o skeleton Laravel trouxe Vite + `package.json`. Mantidos por padrão,
