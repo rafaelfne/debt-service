@@ -62,3 +62,28 @@ it('honours ?fail=500 on Provider B', function (): void {
 
     $response->assertStatus(500);
 });
+
+it('Provider C mock returns the canonical CSV for ABC1234', function (): void {
+    $response = $this->get('/mock/provider-c/debts/ABC1234');
+
+    $response->assertOk();
+    // Laravel appends `; charset=utf-8` to text/* responses; just confirm the prefix.
+    expect($response->headers->get('Content-Type'))->toStartWith('text/csv');
+
+    $body = $response->getContent();
+    expect($body)->toContain('type,amount,due_date')
+        ->and($body)->toContain('IPVA,1500.00,2024-01-10')
+        ->and($body)->toContain('MULTA,300.50,2024-02-15');
+});
+
+it('returns 404 for an unknown plate on Provider C', function (): void {
+    $response = $this->get('/mock/provider-c/debts/UNKNOWN');
+
+    $response->assertStatus(404);
+});
+
+it('honours ?fail=500 on Provider C', function (): void {
+    $response = $this->get('/mock/provider-c/debts/ABC1234?fail=500');
+
+    $response->assertStatus(500);
+});

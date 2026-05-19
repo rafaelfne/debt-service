@@ -50,6 +50,12 @@ return [
             'retries' => (int) env('PROVIDER_B_RETRIES', 3),
             'backoff_ms' => (int) env('PROVIDER_B_BACKOFF_MS', 100),
         ],
+        'c' => [
+            'url' => env('PROVIDER_C_URL'),
+            'timeout' => (int) env('PROVIDER_C_TIMEOUT', 2),
+            'retries' => (int) env('PROVIDER_C_RETRIES', 3),
+            'backoff_ms' => (int) env('PROVIDER_C_BACKOFF_MS', 100),
+        ],
     ],
 
     'resilience' => [
