@@ -1,6 +1,7 @@
 <?php
 
 use App\Infrastructure\Logging\TapPlateMasking;
+use Monolog\Formatter\LineFormatter;
 use Monolog\Handler\NullHandler;
 use Monolog\Handler\StreamHandler;
 use Monolog\Handler\SyslogUdpHandler;
@@ -135,6 +136,30 @@ return [
         'null' => [
             'driver' => 'monolog',
             'handler' => NullHandler::class,
+        ],
+
+        // Demo tracer channel. Writes one concise line per request step to
+        // stderr — visible alongside `composer dev` output. Enabled outside
+        // production via DemoLogger; in production the logger no-ops, so this
+        // channel is never resolved.
+        'demo' => [
+            'driver' => 'monolog',
+            'level' => env('LOG_LEVEL', 'debug'),
+            'handler' => StreamHandler::class,
+            'handler_with' => [
+                'stream' => 'php://stderr',
+            ],
+            'formatter' => LineFormatter::class,
+            'formatter_with' => [
+                // No `[demo]` prefix: Laravel's ServeCommand strips any
+                // leading `[label] ` from worker stderr before forcing the
+                // line into <fg=gray>. We emit color via raw ANSI inside
+                // the message instead — those codes pass through Symfony's
+                // wrap intact and override the gray.
+                'format' => "%message%\n",
+                'allowInlineLineBreaks' => true,
+            ],
+            'tap' => [TapPlateMasking::class],
         ],
 
         'emergency' => [

@@ -7,6 +7,7 @@ namespace App\Infrastructure\Resilience;
 use App\Application\Ports\DebtProvider;
 use App\Application\Ports\ProviderUnavailableException;
 use App\Domain\Plate\Plate;
+use App\Infrastructure\Logging\DemoLogger;
 use Closure;
 
 final class ProviderChain implements DebtProvider
@@ -29,12 +30,15 @@ final class ProviderChain implements DebtProvider
      * defaults to `microtime(true)`.
      *
      * @param  list<DebtProvider>  $providers  ordered canonically (A → B → ...)
+     * @param  list<string>  $providerNames  parallel to $providers; used only for demo logs
      * @param  ?Closure(): float  $clock
      */
     public function __construct(
         private readonly array $providers,
         private readonly float $budgetSeconds = self::DEFAULT_BUDGET_SECONDS,
         private readonly ?Closure $clock = null,
+        private readonly array $providerNames = [],
+        private readonly ?DemoLogger $demoLog = null,
     ) {}
 
     public function fetchDebts(Plate $plate): array
@@ -42,17 +46,31 @@ final class ProviderChain implements DebtProvider
         $start = $this->now();
         $errors = [];
 
-        foreach ($this->providers as $provider) {
+        $this->demoLog?->chainStarted(count($this->providers), $this->budgetSeconds);
+
+        foreach ($this->providers as $i => $provider) {
+            $name = $this->providerNames[$i] ?? "provider-{$i}";
+
             if ($this->now() - $start > $this->budgetSeconds) {
+                $this->demoLog?->budgetExceeded($this->budgetSeconds, count($errors));
+
                 throw new AllProvidersUnavailableException(
                     $errors,
                     "All providers unavailable: budget of {$this->budgetSeconds}s exceeded after ".count($errors).' attempts',
                 );
             }
 
+            $providerStart = $this->now();
             try {
-                return $provider->fetchDebts($plate);
+                $debts = $provider->fetchDebts($plate);
+                $this->demoLog?->providerSucceeded($name, count($debts), $this->now() - $providerStart);
+
+                return $debts;
+            } catch (CircuitOpenException $e) {
+                $this->demoLog?->circuitOpen($name);
+                $errors[] = $e;
             } catch (ProviderUnavailableException $e) {
+                $this->demoLog?->providerFailed($name, $e->getMessage(), $this->now() - $providerStart);
                 $errors[] = $e;
             }
             // Any other exception (UnknownDebtTypeException, InvalidPlateException,

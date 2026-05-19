@@ -34,8 +34,13 @@ cp .env.example .env
 php artisan key:generate
 
 # 3. Rodar a API
-php artisan serve
+composer dev
 # → http://localhost:8000
+# (atalho para `PHP_CLI_SERVER_WORKERS=4 php artisan serve --no-reload` —
+#  workers concorrentes são necessários para que o mesmo servidor consiga atender
+#  o /api/debts/query e o loopback /mock/provider-a|b sem se bloquear; o
+#  --no-reload é obrigatório porque o Laravel só respeita PHP_CLI_SERVER_WORKERS
+#  quando o wrapper de file-watching está desligado)
 ```
 
 Os mocks dos providers já estão registrados em `routes/web.php` (guardados por
@@ -70,6 +75,32 @@ composer test:coverage              # exige 100% no app/Domain + app/Application
 
 O CI (`.github/workflows/ci.yml`) roda matriz PHP 8.2 + 8.3, Pint dry-run, e gate de
 cobertura **100% em Domain + Application** em todo PR.
+
+### Trace de demo no console
+
+Quando rodando fora de produção (`APP_ENV != production`), cada request para
+`/api/debts/query` emite uma sequência de linhas coloridas no `stderr` do
+servidor mostrando cada passo:
+
+```
+→ POST /api/debts/query  placa=ABC****
+→ ProviderChain: trying 2 providers (budget=5.0s)
+  ✗ Provider A failed: Provider A unreachable: ... (elapsed 2.41s)
+  ⚡ circuit-Provider A OPEN — skipping
+  ✓ Provider B returned 2 debts (elapsed 0.18s)
+✓ calculated interest for 2 debts
+✓ simulated payments: 2 options [TOTAL, SOMENTE_IPVA]
+← 200 (total 2.61s)
+```
+
+O tracer é implementado como port `QueryTracer` (Application) + adapter
+`DemoLogger` (Infrastructure) que escreve no canal `demo` configurado em
+[`config/logging.php`](config/logging.php). Em produção o construtor faz
+short-circuit e todo método vira no-op — overhead zero. Placas continuam
+passando pelo `PlateMaskingProcessor` global (mascaradas como `ABC****`).
+
+Para desabilitar manualmente em dev, basta `APP_ENV=production` ou remover
+o middleware `DemoRequestLogger` do api group em [`bootstrap/app.php`](bootstrap/app.php).
 
 ---
 
@@ -233,6 +264,7 @@ sequenceDiagram
 | 8 | Exceptions de domínio + handler central | Controllers ficam minimalistas; a hierarquia `DomainException` mapeia 1:1 para códigos HTTP no handler. |
 | 9 | Monolog processor global para mask de placa | LGPD por construção (não opt-in). Mesmo logs de exceção saem mascarados. |
 | 10 | Resposta JSON com valores monetários como **string** (`"1500.00"`) | Precisão preservada na rede. Cliente decide parsing. Evita perda de casas em JSON.parse JS. |
+| 11 | Demo tracer via port `QueryTracer` + adapter `DemoLogger` | Application depende da porta, não da implementação. ANSI inline porque o `ServeCommand` do Laravel força `<fg=gray>` no stderr dos workers — codes raw sobrevivem ao wrap. No-op em produção via flag no construtor. |
 
 ---
 

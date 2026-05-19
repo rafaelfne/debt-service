@@ -16,11 +16,13 @@ composer test                              # 200 passed em ~3s
 composer test:coverage                     # gate 100% domain+application (precisa pcov)
 ./vendor/bin/pest --filter=Money           # filtra por nome de classe/teste
 ./vendor/bin/pint --test                   # checa estilo
-php artisan serve                          # API em :8000
+composer dev                               # API em :8000 com workers concorrentes (atende loopback dos mocks)
 ./docs/curls/happy-path.sh | jq            # canon do enunciado byte-a-byte
 ./docs/curls/invalid-plate.sh              # 422 validation_failed
 ./docs/curls/all-providers-down.sh         # 503 all_providers_unavailable (após ajustar .env)
 ```
+
+**Trace de demo:** rodando `composer dev` fora de produção, cada request emite no stderr linhas coloridas (`→`, `✓`, `✗`, `⚡`, `←`) mostrando cada passo (chain, fallback, circuit, interest, payments, response). Implementação: port `QueryTracer` em Application + `DemoLogger` em Infrastructure + canal `demo` em `config/logging.php`. No-op em produção. Ver §7.6 e §11 #11.
 
 **Pontos pra abrir primeiro quando o avaliador pedir uma mudança:**
 - Adicionar tipo de débito → §7.2 deste arquivo
@@ -212,6 +214,12 @@ Feature 1 → 2 → 3 ⚠️ → 4 ⚠️ → 5 → 6 ⚠️ → 7 → 8 → 9 �
 3. No use case, repassar para o `InterestCalculator` (que já recebe data no construtor — refatorar para método se necessário).
 4. Default permanece `now()` em UTC.
 
+### Como adicionar um passo no demo tracer
+1. **Decidir a camada.** Se é evento de Application (use case, regra de negócio orquestrada): adicionar o método à port `App\Application\Ports\QueryTracer`. Se é de Infrastructure (chain, breaker, adapter, middleware): emitir direto via `DemoLogger` (Infra-only).
+2. **Implementar o método em `DemoLogger`.** Compor a mensagem com cores ANSI (constantes `RESET/GREEN/RED/...` já existem na classe). Sempre passar pelo `emit()` que prefixa `RESET` para neutralizar o `<fg=gray>` que o `ServeCommand` injeta no stderr dos workers.
+3. **Chamar do call site relevante** via `$this->tracer?->novoMetodo(...)` (Application) ou `$this->demoLog?->novoMetodo(...)` (Infrastructure). Sempre nullable — testes não precisam passar logger.
+4. **Verificar mascaramento.** Se a string contém placa, conferir que o `PlateMaskingProcessor` ainda pega o padrão (regex `\b([A-Za-z]{3})[0-9][A-Za-z0-9][0-9]{2}\b`). Códigos ANSI ao redor não quebram a regex porque os boundaries `\b` ignoram caracteres não-word.
+
 ---
 
 ## 8. Mapa de arquivos
@@ -240,7 +248,8 @@ app/
 ├── Application/
 │   ├── Ports/
 │   │   ├── DebtProvider.php                           # I5.1 (#27)
-│   │   └── ProviderUnavailableException.php
+│   │   ├── ProviderUnavailableException.php
+│   │   └── QueryTracer.php                            # demo tracer port
 │   └── UseCases/
 │       ├── QueryDebtsUseCase.php                      # I5.2 (#28)
 │       ├── DebtQueryResult.php, DebtSummary.php
@@ -259,10 +268,12 @@ app/
     │   ├── Requests/QueryDebtsRequest.php             # I8.2 (#40)
     │   ├── Rules/PlateRule.php                        # I8.1 (#39)
     │   ├── Resources/DebtResponseResource.php         # I8.5 (#43)
-    │   └── Middleware/MaxBodySize.php
+    │   ├── Middleware/MaxBodySize.php
+    │   └── Middleware/DemoRequestLogger.php           # demo tracer entry/exit
     ├── Logging/
     │   ├── PlateMaskingProcessor.php                  # I9.1 (#44)
-    │   └── TapPlateMasking.php
+    │   ├── TapPlateMasking.php
+    │   └── DemoLogger.php                             # demo tracer adapter (impl QueryTracer)
     └── Mocks/
         ├── ProviderAMockController.php                # I6.1 (#30)
         ├── ProviderBMockController.php
@@ -288,11 +299,17 @@ composer test
 ./vendor/bin/pest --filter=IpvaInterestPolicy
 ./vendor/bin/pest --coverage
 
-# Rodar API local
-php artisan serve
+# Rodar API local — usa PHP_CLI_SERVER_WORKERS=4 + --no-reload para que o mesmo
+# servidor consiga atender o /api/debts/query e o loopback /mock/provider-a|b em
+# paralelo. Sem isso, o php artisan serve single-thread bloqueia a si mesmo e a
+# chain estoura o budget de 5s sem nunca tentar o Provider B.
+#
+# Atenção: o Laravel ServeCommand só respeita PHP_CLI_SERVER_WORKERS quando
+# --no-reload é passado (caso contrário, o wrapper de file-watching força 1 worker).
+composer dev
 
-# Subir mocks (depois da I6.1) — em outro terminal
-PROVIDER_A_URL=http://localhost:8000/mock/provider-a php artisan serve
+# Equivalente sem o wrapper composer:
+# PHP_CLI_SERVER_WORKERS=4 php artisan serve --no-reload
 
 # Request de exemplo (depois da I8.3)
 curl -X POST http://localhost:8000/api/debts/query \
@@ -320,6 +337,8 @@ php artisan route:list
 8. **Timezone do `DateTimeImmutable`** sem normalizar para UTC. Off-by-one nos dias em atraso.
 9. **Lista vazia de débitos** retornando `[TOTAL R$ 0]` ou `[]` sem decisão. Documentar antes da I5.3.
 10. **Body do JSON com campo monetário como número** (`"valor": 1500.00`) em vez de string (`"valor": "1500.00"`). Verificar com `is_string` no teste de byte-a-byte.
+11. **`TapPlateMasking` com type-hint apertado em `Monolog\Logger`.** O `LogManager::tap` do Laravel envolve o `Monolog\Logger` num `Illuminate\Log\Logger` antes de chamar o tap — type-hint estrito quebra em runtime, é silenciosamente capturado pelo try/catch interno do `LogManager::get`, e cai num emergency logger para `storage/logs/laravel.log`. Resultado: o processor de masking **nunca roda**, violando a invariante #8. Aceitar `Monolog\Logger | Illuminate\Log\Logger` no `__invoke` e desempacotar via `getLogger()`.
+12. **ANSI codes no `[demo]` sendo descartados pelo `ServeCommand`.** O Laravel filtra stderr dos workers: linhas começando com `[` têm prefixo até `] ` stripado, depois tudo é envolvido em `<fg=gray>`. Solução: (a) não usar prefix `[label]` no formatter, (b) prefixar cada mensagem com `\033[0m` para neutralizar o gray, (c) injetar SGR codes inline nos tokens que devem destacar.
 
 ---
 
@@ -337,6 +356,7 @@ php artisan route:list
 | 8 | Exceptions de domínio + handler central | Controllers ficam minimalistas |
 | 9 | Monolog processor global para mask | LGPD por construção, não opt-in |
 | 10 | Resposta JSON com valores como **string** | Precisão preservada na rede |
+| 11 | Demo tracer via port `QueryTracer` + adapter `DemoLogger` em canal Monolog `demo` (stderr) | Application depende da porta, não da impl. ANSI inline pq o `ServeCommand` força `<fg=gray>` nos workers. No-op em produção via flag no construtor. |
 
 ---
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Domain\Debt\UnknownDebtTypeException;
 use App\Domain\Plate\InvalidPlateException;
+use App\Infrastructure\Http\Middleware\DemoRequestLogger;
 use App\Infrastructure\Http\Middleware\MaxBodySize;
 use App\Infrastructure\Resilience\AllProvidersUnavailableException;
 use Illuminate\Foundation\Application;
@@ -23,6 +24,10 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'max_body_size' => MaxBodySize::class,
         ]);
+
+        // Demo tracer wraps every api request with → / ← lines on stderr.
+        // No-op in production via the DemoLogger constructor flag.
+        $middleware->api(append: [DemoRequestLogger::class]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $jsonOnly = static fn (Request $request): bool => $request->is('api/*')
