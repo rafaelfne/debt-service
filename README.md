@@ -34,8 +34,13 @@ cp .env.example .env
 php artisan key:generate
 
 # 3. Rodar a API
-php artisan serve
+composer dev
 # → http://localhost:8000
+# (atalho para `PHP_CLI_SERVER_WORKERS=4 php artisan serve --no-reload` —
+#  workers concorrentes são necessários para que o mesmo servidor consiga atender
+#  o /api/debts/query e o loopback /mock/provider-a|b sem se bloquear; o
+#  --no-reload é obrigatório porque o Laravel só respeita PHP_CLI_SERVER_WORKERS
+#  quando o wrapper de file-watching está desligado)
 ```
 
 Os mocks dos providers já estão registrados em `routes/web.php` (guardados por
