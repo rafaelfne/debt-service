@@ -2,19 +2,26 @@
 
 declare(strict_types=1);
 
+use App\Application\Ports\DebtProvider;
+use Tests\Support\Fakes\FakeDebtProvider;
+
+beforeEach(function (): void {
+    // I8.3 swapped the closure for DebtsController, which resolves the full
+    // chain (HTTP-bound providers). Stub it so happy-path requests stay
+    // self-contained to the FormRequest + middleware behaviour we care about.
+    $this->app->instance(DebtProvider::class, FakeDebtProvider::withDebts([]));
+});
+
 it('accepts a request with a valid plate', function (): void {
     $this->postJson('/api/debts/query', ['placa' => 'ABC1234'])
         ->assertOk()
-        ->assertExactJson(['placa' => 'ABC1234']);
+        ->assertJsonPath('placa', 'ABC1234');
 });
 
-it('normalises lowercase plates to uppercase before reaching the handler', function (): void {
+it('passes lowercase plates through the controller (normalised by Plate VO)', function (): void {
     $this->postJson('/api/debts/query', ['placa' => 'abc1d23'])
         ->assertOk()
-        ->assertExactJson(['placa' => 'abc1d23']);
-    // The closure echoes whatever passed validation — the Plate VO normalises
-    // when constructed, not the FormRequest. I8.3 will use Plate::fromString and
-    // any downstream serialisation goes through the VO.
+        ->assertJsonPath('placa', 'ABC1D23');
 });
 
 it('rejects a request with an invalid plate (422 validation_failed)', function (): void {
@@ -56,16 +63,11 @@ it('rejects a body larger than 1 MiB with 413 payload_too_large', function (): v
 });
 
 it('accepts a body just under the 1 MiB limit', function (): void {
-    // Tight: the JSON envelope adds wrapping; pick a noise size that keeps the
-    // serialised body comfortably under 1 MiB but big enough to prove the
-    // boundary is not 0.
+    // unknown_fields fires BEFORE max_body_size triggers, since the body is
+    // well under the limit but contains an extra `noise` key.
     $payload = ['placa' => 'ABC1234', 'noise' => str_repeat('x', 1_000_000)];
 
-    $response = $this->postJson('/api/debts/query', $payload);
-
-    // unknown_fields triggers BEFORE max_body_size since the middleware passes
-    // and only then the FormRequest's prepareForValidation runs. We just need
-    // 413 to NOT fire, so 422 unknown_fields is the expected sentinel.
-    $response->assertStatus(422)
+    $this->postJson('/api/debts/query', $payload)
+        ->assertStatus(422)
         ->assertJsonPath('error', 'unknown_fields');
 });
