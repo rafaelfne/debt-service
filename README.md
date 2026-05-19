@@ -135,8 +135,13 @@ A alternativa "consenso" fica como melhoria futura, exigindo regra explícita de
 - **Persistência:** nenhuma. Cada request consulta os providers do zero. Adicionar cache
   (Redis com TTL curto por placa) reduz latência e custo dos providers, mas exige decisão
   sobre invalidação.
-- **Circuit breaker em cluster:** estado in-memory. Múltiplas instâncias do app não
-  compartilham — risco de "thundering herd" parcial. Mover para Redis se for horizontal.
+- **Circuit breaker em cluster:** `CircuitBreaker` mantém estado **in-memory** por
+  instância (counter de falhas + `openedAt`). Default: `failureThreshold = 5`,
+  `cooldownSeconds = 30`. Cada provider tem seu próprio breaker (decorator
+  `CircuitBreakerDebtProvider` envolve o adapter antes do `ProviderChain`). Múltiplas
+  instâncias do app **não compartilham o counter** — cada uma trip independente.
+  Pra produção horizontal, migrar pra Redis (chave `cb:provider-a:count`) é a
+  evolução natural. CLAUDE.md §11 #7 documenta a decisão.
 - **Tipos de débito:** apenas `IPVA` e `MULTA`. Adicionar `LICENCIAMENTO` é uma nova
   `InterestPolicy` + registro no service provider (guia em `CLAUDE.md` §7).
 - **Resposta para lista vazia:** quando o provider retorna `[]`, o `QueryDebtsUseCase`
