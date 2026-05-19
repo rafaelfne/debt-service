@@ -6,6 +6,7 @@ namespace App\Providers;
 
 use App\Application\Ports\DebtProvider;
 use App\Application\Ports\ProviderUnavailableException;
+use App\Application\Ports\QueryTracer;
 use App\Domain\Debt\DebtType;
 use App\Domain\Debt\InterestCalculator;
 use App\Domain\Debt\IpvaInterestPolicy;
@@ -13,6 +14,7 @@ use App\Domain\Debt\MultaInterestPolicy;
 use App\Domain\Payment\CreditCardSimulator;
 use App\Domain\Payment\PaymentSimulator;
 use App\Domain\Payment\PixSimulator;
+use App\Infrastructure\Logging\DemoLogger;
 use App\Infrastructure\Providers\ProviderAJsonAdapter;
 use App\Infrastructure\Providers\ProviderBXmlAdapter;
 use App\Infrastructure\Resilience\CircuitBreaker;
@@ -21,6 +23,7 @@ use App\Infrastructure\Resilience\ProviderChain;
 use DateTimeImmutable;
 use DateTimeZone;
 use Illuminate\Contracts\Foundation\Application;
+use Illuminate\Log\LogManager;
 use Illuminate\Support\ServiceProvider;
 use Throwable;
 
@@ -57,32 +60,48 @@ class AppServiceProvider extends ServiceProvider
             ],
         ));
 
+        // Demo tracer — enabled outside production. When disabled, every
+        // call site is a no-op (constructor short-circuits the channel).
+        $this->app->singleton(DemoLogger::class, fn (): DemoLogger => new DemoLogger(
+            enabled: ! $this->app->isProduction(),
+            manager: $this->app->make(LogManager::class),
+        ));
+        // Application depends on the QueryTracer port; Infrastructure
+        // provides DemoLogger as the implementation.
+        $this->app->bind(QueryTracer::class, DemoLogger::class);
+
         // Provider chain wire-up. Each adapter pulls its URL + network knobs
         // from config; each gets an isolated CircuitBreaker so a slow Provider
         // B never trips Provider A's circuit.
-        $this->app->singleton(DebtProvider::class, fn (): ProviderChain => new ProviderChain(
-            providers: [
-                new CircuitBreakerDebtProvider(
-                    inner: new ProviderAJsonAdapter(
-                        baseUrl: (string) config('business.providers.a.url'),
-                        timeoutSeconds: (int) config('business.providers.a.timeout'),
-                        retryAttempts: (int) config('business.providers.a.retries'),
-                        retryBackoffMs: (int) config('business.providers.a.backoff_ms'),
+        $this->app->singleton(DebtProvider::class, function (): ProviderChain {
+            $demoLog = $this->app->make(DemoLogger::class);
+
+            return new ProviderChain(
+                providers: [
+                    new CircuitBreakerDebtProvider(
+                        inner: new ProviderAJsonAdapter(
+                            baseUrl: (string) config('business.providers.a.url'),
+                            timeoutSeconds: (int) config('business.providers.a.timeout'),
+                            retryAttempts: (int) config('business.providers.a.retries'),
+                            retryBackoffMs: (int) config('business.providers.a.backoff_ms'),
+                        ),
+                        breaker: $this->makeBreaker(),
                     ),
-                    breaker: $this->makeBreaker(),
-                ),
-                new CircuitBreakerDebtProvider(
-                    inner: new ProviderBXmlAdapter(
-                        baseUrl: (string) config('business.providers.b.url'),
-                        timeoutSeconds: (int) config('business.providers.b.timeout'),
-                        retryAttempts: (int) config('business.providers.b.retries'),
-                        retryBackoffMs: (int) config('business.providers.b.backoff_ms'),
+                    new CircuitBreakerDebtProvider(
+                        inner: new ProviderBXmlAdapter(
+                            baseUrl: (string) config('business.providers.b.url'),
+                            timeoutSeconds: (int) config('business.providers.b.timeout'),
+                            retryAttempts: (int) config('business.providers.b.retries'),
+                            retryBackoffMs: (int) config('business.providers.b.backoff_ms'),
+                        ),
+                        breaker: $this->makeBreaker(),
                     ),
-                    breaker: $this->makeBreaker(),
-                ),
-            ],
-            budgetSeconds: (float) config('business.resilience.chain_budget_seconds'),
-        ));
+                ],
+                budgetSeconds: (float) config('business.resilience.chain_budget_seconds'),
+                providerNames: ['Provider A', 'Provider B'],
+                demoLog: $demoLog,
+            );
+        });
     }
 
     public function boot(): void
