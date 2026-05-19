@@ -12,11 +12,14 @@ Guia de desenvolvimento para o **Serviço de Consulta e Simulação de Débitos 
 
 **Comandos quentes pra demo:**
 ```bash
-composer test                              # 200 passed em ~3s
+composer test                              # 207 passed em ~3s
 composer test:coverage                     # gate 100% domain+application (precisa pcov)
 ./vendor/bin/pest --filter=Money           # filtra por nome de classe/teste
 ./vendor/bin/pint --test                   # checa estilo
-php artisan serve                          # API em :8000
+composer dev                               # API + queue + pail + vite em paralelo
+                                           # (sobe `artisan serve` com PHP_CLI_SERVER_WORKERS=4
+                                           # — necessário pra mocks chamarem a si mesmos sem deadlock)
+php artisan serve                          # alternativa single-process; OK pra requests externos
 ./docs/curls/happy-path.sh | jq            # canon do enunciado byte-a-byte
 ./docs/curls/invalid-plate.sh              # 422 validation_failed
 ./docs/curls/all-providers-down.sh         # 503 all_providers_unavailable (após ajustar .env)
