@@ -72,22 +72,9 @@ class AppServiceProvider extends ServiceProvider
 
         // Provider chain wire-up. Each adapter pulls its URL + network knobs
         // from config; each gets an isolated CircuitBreaker so a slow Provider
-        // B never trips Provider A's circuit.
-        // Demo tracer — enabled outside production. When disabled, every
-        // call site is a no-op (constructor short-circuits the channel).
-        $this->app->singleton(DemoLogger::class, fn (): DemoLogger => new DemoLogger(
-            enabled: ! $this->app->isProduction(),
-            manager: $this->app->make(LogManager::class),
-        ));
-        // Application depends on the QueryTracer port; Infrastructure
-        // provides DemoLogger as the implementation.
-        $this->app->bind(QueryTracer::class, DemoLogger::class);
-
-        // Provider chain wire-up. Each adapter is wrapped in its own CircuitBreaker
-        // so a slow Provider B never trips Provider A's circuit, and vice versa.
-        // The chain is bound as the application's DebtProvider implementation, so
-        // QueryDebtsUseCase resolves the full resilience stack without knowing
-        // about it.
+        // B never trips Provider A's circuit. The chain is bound as the
+        // application's DebtProvider implementation, so QueryDebtsUseCase
+        // resolves the full resilience stack without knowing about it.
         $this->app->singleton(DebtProvider::class, function (): ProviderChain {
             $demoLog = $this->app->make(DemoLogger::class);
 
@@ -100,7 +87,6 @@ class AppServiceProvider extends ServiceProvider
                             retryAttempts: (int) config('business.providers.a.retries'),
                             retryBackoffMs: (int) config('business.providers.a.backoff_ms'),
                             simulateFailure: (string) config('business.providers.a.fail'),
-                            baseUrl: (string) config('providers.a.url', env('PROVIDER_A_URL', '')),
                         ),
                         breaker: $this->makeBreaker(),
                     ),
@@ -111,7 +97,6 @@ class AppServiceProvider extends ServiceProvider
                             retryAttempts: (int) config('business.providers.b.retries'),
                             retryBackoffMs: (int) config('business.providers.b.backoff_ms'),
                             simulateFailure: (string) config('business.providers.b.fail'),
-                            baseUrl: (string) config('providers.b.url', env('PROVIDER_B_URL', '')),
                         ),
                         breaker: $this->makeBreaker(),
                     ),
