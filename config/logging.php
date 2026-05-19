@@ -1,5 +1,6 @@
 <?php
 
+use App\Infrastructure\Logging\TapPlateMasking;
 use Monolog\Handler\NullHandler;
 use Monolog\Handler\StreamHandler;
 use Monolog\Handler\SyslogUdpHandler;
@@ -48,6 +49,12 @@ return [
     | Available drivers: "single", "daily", "slack", "syslog",
     |                    "errorlog", "monolog", "custom", "stack"
     |
+    | NOTE: every leaf channel below has `tap` => [TapPlateMasking::class] so
+    | the PlateMaskingProcessor is attached to every handler at resolution
+    | time. LGPD by construction (CLAUDE.md §11 #9). `stack` itself does not
+    | need the tap because Laravel applies the inner channels' taps when it
+    | composes them.
+    |
     */
 
     'channels' => [
@@ -63,6 +70,7 @@ return [
             'path' => storage_path('logs/laravel.log'),
             'level' => env('LOG_LEVEL', 'debug'),
             'replace_placeholders' => true,
+            'tap' => [TapPlateMasking::class],
         ],
 
         'daily' => [
@@ -71,6 +79,7 @@ return [
             'level' => env('LOG_LEVEL', 'debug'),
             'days' => env('LOG_DAILY_DAYS', 14),
             'replace_placeholders' => true,
+            'tap' => [TapPlateMasking::class],
         ],
 
         'slack' => [
@@ -80,6 +89,7 @@ return [
             'emoji' => env('LOG_SLACK_EMOJI', ':boom:'),
             'level' => env('LOG_LEVEL', 'critical'),
             'replace_placeholders' => true,
+            'tap' => [TapPlateMasking::class],
         ],
 
         'papertrail' => [
@@ -92,6 +102,7 @@ return [
                 'connectionString' => 'tls://'.env('PAPERTRAIL_URL').':'.env('PAPERTRAIL_PORT'),
             ],
             'processors' => [PsrLogMessageProcessor::class],
+            'tap' => [TapPlateMasking::class],
         ],
 
         'stderr' => [
@@ -103,6 +114,7 @@ return [
             ],
             'formatter' => env('LOG_STDERR_FORMATTER'),
             'processors' => [PsrLogMessageProcessor::class],
+            'tap' => [TapPlateMasking::class],
         ],
 
         'syslog' => [
@@ -110,12 +122,14 @@ return [
             'level' => env('LOG_LEVEL', 'debug'),
             'facility' => env('LOG_SYSLOG_FACILITY', LOG_USER),
             'replace_placeholders' => true,
+            'tap' => [TapPlateMasking::class],
         ],
 
         'errorlog' => [
             'driver' => 'errorlog',
             'level' => env('LOG_LEVEL', 'debug'),
             'replace_placeholders' => true,
+            'tap' => [TapPlateMasking::class],
         ],
 
         'null' => [
