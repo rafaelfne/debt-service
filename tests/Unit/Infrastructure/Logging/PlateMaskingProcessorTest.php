@@ -112,6 +112,32 @@ it('does NOT mask strings that just look short or wrong', function (): void {
         ->and($masked->context['normal'])->toBe('A regular sentence with no plate.');
 });
 
+it('masks a plate wrapped by ANSI SGR escapes (DemoLogger tracer case)', function (): void {
+    $magenta = "\033[95m";
+    $reset = "\033[0m";
+    $record = recordWith(message: "placa={$magenta}ABC1234{$reset}");
+
+    $masked = ($this->processor)($record);
+
+    expect($masked->message)->toBe("placa={$magenta}ABC****{$reset}");
+});
+
+it('masks ANSI-wrapped Mercosul plates too', function (): void {
+    $record = recordWith(message: "x \033[95mABC1D23\033[0m y");
+
+    $masked = ($this->processor)($record);
+
+    expect($masked->message)->toBe("x \033[95mABC****\033[0m y");
+});
+
+it('does NOT match a stray `m` not preceded by an SGR escape', function (): void {
+    $record = recordWith(message: 'mABC1234 should be left alone');
+
+    $masked = ($this->processor)($record);
+
+    expect($masked->message)->toBe('mABC1234 should be left alone');
+});
+
 it('preserves the original record fields it does not touch (level, channel, datetime)', function (): void {
     $original = recordWith(context: ['plate' => 'ABC1234']);
 

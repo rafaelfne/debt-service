@@ -17,6 +17,7 @@ composer test:coverage                     # gate 100% domain+application (preci
 ./vendor/bin/pest --filter=Money           # filtra por nome de classe/teste
 ./vendor/bin/pint --test                   # checa estilo
 composer dev                               # API em :8000 com workers concorrentes (atende loopback dos mocks)
+./docs/demo/run.sh                         # abre janela nova c/ server+tracer; tee em storage/logs/demo-trace.log
 ./docs/curls/happy-path.sh | jq            # canon do enunciado byte-a-byte
 ./docs/curls/invalid-plate.sh              # 422 validation_failed
 ./docs/curls/all-providers-down.sh         # 503 all_providers_unavailable (após ajustar .env)
@@ -239,7 +240,7 @@ Feature 1 → 2 → 3 ⚠️ → 4 ⚠️ → 5 → 6 ⚠️ → 7 → 8 → 9 �
 1. **Decidir a camada.** Se é evento de Application (use case, regra de negócio orquestrada): adicionar o método à port `App\Application\Ports\QueryTracer`. Se é de Infrastructure (chain, breaker, adapter, middleware): emitir direto via `DemoLogger` (Infra-only).
 2. **Implementar o método em `DemoLogger`.** Compor a mensagem com cores ANSI (constantes `RESET/GREEN/RED/...` já existem na classe). Sempre passar pelo `emit()` que prefixa `RESET` para neutralizar o `<fg=gray>` que o `ServeCommand` injeta no stderr dos workers.
 3. **Chamar do call site relevante** via `$this->tracer?->novoMetodo(...)` (Application) ou `$this->demoLog?->novoMetodo(...)` (Infrastructure). Sempre nullable — testes não precisam passar logger.
-4. **Verificar mascaramento.** Se a string contém placa, conferir que o `PlateMaskingProcessor` ainda pega o padrão (regex `\b([A-Za-z]{3})[0-9][A-Za-z0-9][0-9]{2}\b`). Códigos ANSI ao redor não quebram a regex porque os boundaries `\b` ignoram caracteres não-word.
+4. **Verificar mascaramento.** Se a string contém placa, conferir que o `PlateMaskingProcessor` pega o padrão. **Cuidado com ANSI adjacente:** SGR escapes terminam em `m` (word char), então `\b` puro **não** matcha entre `\033[95m` e `ABC1234` — por isso o regex tem um branch extra `(?<=\033\[[\d;]{0,16}m)` no left boundary. Se você inventar uma cor nova que termina em outra letra (não-`m`), revisar o regex. Cobertura: `PlateMaskingProcessorTest` tem casos ANSI-wrapped.
 
 ---
 

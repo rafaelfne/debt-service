@@ -21,7 +21,15 @@ use Monolog\Processor\ProcessorInterface;
  */
 final class PlateMaskingProcessor implements ProcessorInterface
 {
-    private const PATTERN = '/\b([A-Za-z]{3})[0-9][A-Za-z0-9][0-9]{2}\b/';
+    /**
+     * Left boundary is either a normal word boundary OR the closing `m` of a
+     * SGR escape (`\033[...m`). Without the SGR branch, plates embedded in
+     * ANSI-colored tracer lines like `\033[95mABC1234\033[0m` leak in clear:
+     * the `m` of `\033[95m` is a word character touching `A`, so plain `\b`
+     * fails. Right boundary keeps `\b` because plates end in a digit which
+     * naturally borders the next ESC (non-word) or whitespace.
+     */
+    private const PATTERN = '/(?:\b|(?<=\033\[[\d;]{0,16}m))([A-Za-z]{3})[0-9][A-Za-z0-9][0-9]{2}\b/';
 
     public function __invoke(LogRecord $record): LogRecord
     {

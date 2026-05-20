@@ -22,13 +22,22 @@ PROVIDER_B_URL=http://127.0.0.1:8000/mock/provider-b
 # Demais vars: deixar comentadas para usar defaults canônicos
 ```
 
-Servidor numa aba dedicada (mantém de pé durante toda a demo):
+Servidor numa aba dedicada (mantém de pé durante toda a demo). Forma recomendada:
 
 ```bash
-composer dev
+./docs/demo/run.sh
 ```
 
-Por que `composer dev` e não `php artisan serve`? Porque `composer dev` injeta `PHP_CLI_SERVER_WORKERS=4 --no-reload`, permitindo que o mesmo processo atenda `/api/debts/query` E o loopback `/mock/provider-{a,b}` em paralelo. Single-thread bloqueia a si mesmo e a chain estoura o budget. Detalhes em [CLAUDE.md §9](../CLAUDE.md).
+Esse script abre uma janela **nova** (Ghostty se instalado, senão Terminal.app) rodando o server + tracer; sua aba atual fica livre pros curls. Bônus: tee'a o trace em `storage/logs/demo-trace.log`, então dá pra "voltar" e mostrar o trace de um request anterior com `tail -n 50 storage/logs/demo-trace.log` ou `less -R` (cores preservadas).
+
+Equivalente manual, sem o launcher:
+
+```bash
+composer dev                                   # apenas trace na janela
+./docs/demo/server.sh                          # composer dev + tee pra arquivo
+```
+
+Por que `composer dev` (ou o wrapper) e não `php artisan serve` direto? Porque ele injeta `PHP_CLI_SERVER_WORKERS=4 --no-reload`, permitindo que o mesmo processo atenda `/api/debts/query` E o loopback `/mock/provider-{a,b}` em paralelo. Single-thread bloqueia a si mesmo e a chain estoura o budget. Detalhes em [CLAUDE.md §9](../CLAUDE.md).
 
 Padrão de curl recomendado (mostra HTTP status sem quebrar o `jq`):
 
@@ -244,13 +253,26 @@ O `composer dev` em modo non-prod liga o tracer no stderr automaticamente. Duran
 
 ## 6. LGPD — mascaramento de placas
 
+A placa em claro só pode aparecer no body da request. Em **qualquer canal de log** (tracer demo, error log) ela é mascarada.
+
+Demonstração via tracer (caminho normal — `composer dev` ou `./docs/demo/run.sh`):
+
 ```bash
 ./docs/curls/happy-path.sh > /dev/null
-tail -n 20 storage/logs/laravel.log | grep -i 'placa\|plate\|ABC'
+tail -n 20 storage/logs/demo-trace.log | grep -E 'ABC|plac'
+```
+
+**Importante:** `storage/logs/laravel.log` **não** recebe nada no happy path — ele só guarda stack traces quando uma exception sobe pro handler. O tracer demo vai pro canal Monolog `demo` (stderr → tee → `demo-trace.log`). Ambos os canais têm `TapPlateMasking` aplicado globalmente em `config/logging.php`.
+
+Se preferir provocar uma escrita no `laravel.log` pra mostrar a invariante, force um erro mapeado pelo handler:
+
+```bash
+./docs/curls/invalid-plate.sh > /dev/null      # 422 + log do handler
+tail -n 5 storage/logs/laravel.log | grep -E 'INVALID|plac'
 ```
 
 **O que mostrar:**
-- Placa aparece mascarada (`***1234` ou similar), **nunca** `ABC1234` em claro.
+- Placa aparece mascarada (`ABC****` — 3 letras + 4 estrelas, ver [PlateMaskingProcessor.php](../app/Infrastructure/Logging/PlateMaskingProcessor.php#L23)), **nunca** `ABC1234` em claro.
 - `PlateMaskingProcessor` é registrado globalmente via tap em `config/logging.php` → vale pra **todos** os canais, não opt-in.
 - `TapPlateMasking` aceita `Monolog\Logger` E `Illuminate\Log\Logger` (armadilha #11 da [CLAUDE.md §10](../CLAUDE.md)) — sem isso, o tap silenciosamente caía no emergency logger e o mask nunca rodava.
 - Invariante #8 da §4: LGPD por construção.
