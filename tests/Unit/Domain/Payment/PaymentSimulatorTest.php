@@ -27,26 +27,28 @@ function makeUpdatedDebt(DebtType $type, string $original, string $updated): Upd
     );
 }
 
-it('canon ENUNCIADO: [IPVA 1800.00, MULTA 555.93] → [TOTAL 2355.93, SOMENTE_IPVA 1800.00, SOMENTE_MULTA 555.93]', function (): void {
+it('canon ENUNCIADO: [IPVA 1800.40, MULTA 555.93] → [TOTAL 2356.32, SOMENTE_IPVA 1800.40, SOMENTE_MULTA 555.93]', function (): void {
+    // Updated amounts kept at full internal precision (IPVA 1800.396, MULTA 555.925),
+    // matching the real pipeline. Their sum is 2356.321 → toString 2356.32.
     $debts = [
-        makeUpdatedDebt(DebtType::IPVA, '1500.33', '1800.00'),
-        makeUpdatedDebt(DebtType::MULTA, '300.50', '555.93'),
+        makeUpdatedDebt(DebtType::IPVA, '1500.33', '1800.396'),
+        makeUpdatedDebt(DebtType::MULTA, '300.50', '555.925'),
     ];
 
     $options = $this->simulator->simulate($debts);
 
     expect($options)->toHaveCount(3);
     expect($options[0]->type)->toBe('TOTAL');
-    expect($options[0]->baseAmount->toString())->toBe('2355.93');
+    expect($options[0]->baseAmount->toString())->toBe('2356.32');
     expect($options[1]->type)->toBe('SOMENTE_IPVA');
-    expect($options[1]->baseAmount->toString())->toBe('1800.00');
+    expect($options[1]->baseAmount->toString())->toBe('1800.40');
     expect($options[2]->type)->toBe('SOMENTE_MULTA');
     expect($options[2]->baseAmount->toString())->toBe('555.93');
 });
 
-it('canon DOIS DO MESMO TIPO: [IPVA 1000, IPVA 500] → [TOTAL 1500, SOMENTE_IPVA 1500] (singular, sem duplicar)', function (): void {
+it('canon DOIS DO MESMO TIPO: [IPVA 1000.33, IPVA 500] → [TOTAL 1500.33, SOMENTE_IPVA 1500.33] (singular, sem duplicar)', function (): void {
     $debts = [
-        makeUpdatedDebt(DebtType::IPVA, '1000.00', '1000.00'),
+        makeUpdatedDebt(DebtType::IPVA, '1000.33', '1000.33'),
         makeUpdatedDebt(DebtType::IPVA, '500.00', '500.00'),
     ];
 

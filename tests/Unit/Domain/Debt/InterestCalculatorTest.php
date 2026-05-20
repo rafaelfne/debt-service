@@ -39,7 +39,7 @@ it('returns an UpdatedDebt VO with the right shape', function (): void {
         ->and($result->originalAmount->toString())->toBe('1500.33');
 });
 
-it('canon IPVA: 1500.33 due 2024-01-10, ref 2024-05-10 → updated 1800.00', function (): void {
+it('canon IPVA: 1500.33 due 2024-01-10, ref 2024-05-10 → updated 1800.40', function (): void {
     $debt = new Debt(
         DebtType::IPVA,
         Money::of('1500.33'),
@@ -48,8 +48,9 @@ it('canon IPVA: 1500.33 due 2024-01-10, ref 2024-05-10 → updated 1800.00', fun
 
     $result = calculatorWithFullPolicies()->calculate($debt);
 
+    // 1500.33 + cap(1500.33 × 0.20 = 300.066) = 1800.396 → toString 1800.40.
     expect($result->daysOverdue)->toBe(121)
-        ->and($result->updatedAmount->toString())->toBe('1800.00');
+        ->and($result->updatedAmount->toString())->toBe('1800.40');
 });
 
 it('canon MULTA: 300.50 due 2024-02-15, ref 2024-05-10 → updated 555.93', function (): void {
@@ -65,7 +66,7 @@ it('canon MULTA: 300.50 due 2024-02-15, ref 2024-05-10 → updated 555.93', func
         ->and($result->updatedAmount->toString())->toBe('555.93');
 });
 
-it('canon COMBINED: IPVA + MULTA → 1800.00 + 555.93 = 2355.93', function (): void {
+it('canon COMBINED: IPVA + MULTA → 1800.40 + 555.93 = 2356.32', function (): void {
     $calculator = calculatorWithFullPolicies();
     $debts = [
         new Debt(
@@ -87,9 +88,9 @@ it('canon COMBINED: IPVA + MULTA → 1800.00 + 555.93 = 2355.93', function (): v
         Money::zero(),
     );
 
-    expect($updated[0]->updatedAmount->toString())->toBe('1800.00')
+    expect($updated[0]->updatedAmount->toString())->toBe('1800.40')
         ->and($updated[1]->updatedAmount->toString())->toBe('555.93')
-        ->and($total->toString())->toBe('2355.93');
+        ->and($total->toString())->toBe('2356.32');
 });
 
 it('returns daysOverdue=0 and updated==original when reference is before due', function (): void {

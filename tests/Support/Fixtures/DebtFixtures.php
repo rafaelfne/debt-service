@@ -12,7 +12,7 @@ use DateTimeZone;
 
 /**
  * Canonical debts from the enunciado, anchored to the reference date 2024-05-10:
- *   - IPVA 1500.33 due 2024-01-10 (121 days overdue → updated 1800.00)
+ *   - IPVA 1500.33 due 2024-01-10 (121 days overdue → updated 1800.40)
  *   - MULTA 300.50 due 2024-02-15 (85 days overdue → updated 555.93)
  */
 final class DebtFixtures
