@@ -193,16 +193,47 @@ for ($i = 1; $i <= 5; $i++) {
 
 Funciona porque tudo roda no mesmo processo PHP — o `failureCount` acumula entre as iterações do loop.
 
-### 3.3 Discussão arquitetural (sem código)
+### 3.3 Demo HTTP do breaker (com `CB_STORE=file`)
 
-Por que o breaker **não** aparece via curl numa demo HTTP:
-- PHP é shared-nothing: cada request boota `public/index.php` do zero, container é recriado, `failureCount` zera.
-- Isso é independente de cluster — vale pra single-instance também.
-- **Caminhos de evolução** (mencionar como conhecimento, sem implementar):
-  - **APCu via `Cache`** (single-instance, shared memory do PHP — sem dependência externa).
-  - **Laravel Octane** (FrankenPHP / Swoole / RoadRunner — mantém app vivo, singletons persistem).
-  - **Redis-backed `CircuitBreaker`** (cluster).
-- Decisão registrada em [CLAUDE.md §11 #7](../CLAUDE.md) e no comentário do [CircuitBreaker.php:24-26](../app/Infrastructure/Resilience/CircuitBreaker.php#L24).
+Por padrão, o breaker é **per-process** (shared-nothing do PHP). Pra demo via curl, ligar o store em arquivo no `.env`:
+
+```env
+PROVIDER_A_FAIL=500
+PROVIDER_B_FAIL=500
+PROVIDER_A_RETRIES=0
+PROVIDER_B_RETRIES=0
+CB_FAILURE_THRESHOLD=2
+CB_COOLDOWN_SECONDS=30
+CB_STORE=file
+```
+
+`php artisan config:clear && composer dev`. Depois, na outra aba:
+
+```bash
+rm -f storage/app/circuit-breaker/*.json   # estado limpo
+for i in 1 2 3 4; do
+  curl -s -X POST http://localhost:8000/api/debts/query \
+    -H 'Content-Type: application/json' \
+    -d '{"placa":"ABC1234"}' | jq -r '.error_code'
+done
+```
+
+**Esperado:**
+- Hits 1–2: `all_providers_unavailable` por `500` dos providers (cada um falha 2x → tripa o respectivo breaker).
+- Hits 3+: mesmo `error_code`, mas a causa interna passa a ser `Circuit breaker is open` (visível no tracer do `composer dev` em stderr).
+
+Limpar pra próxima rodada: `rm storage/app/circuit-breaker/*.json` (ou esperar 30s do cooldown).
+
+### 3.4 Discussão arquitetural
+
+O `CB_STORE=file` é uma solução **single-instance**: usa `flock()` sobre `storage/app/circuit-breaker/<provider>.json`, então funciona pros workers do `php artisan serve` na mesma máquina mas **não** pra cluster (file locks são locais). O default segue `memory` (per-process) pra preservar comportamento dos testes byte-a-byte.
+
+**Caminhos de evolução** (mencionar como conhecimento, sem implementar):
+- **APCu via `Cache`** (single-instance sem I/O em disco — mais rápido que arquivo).
+- **Laravel Octane** (FrankenPHP / Swoole / RoadRunner — mantém app vivo, singletons in-memory persistem entre requests).
+- **Redis-backed `CircuitBreaker`** (cluster, com CAS pra atomicidade real).
+
+Decisão registrada em [CLAUDE.md §11 #7](../CLAUDE.md) e no comentário do [CircuitBreaker.php](../app/Infrastructure/Resilience/CircuitBreaker.php).
 
 ---
 
@@ -220,10 +251,11 @@ Para cada item: edita `.env` → `php artisan config:clear` → `composer dev` �
 | Body limit 2MB | `HTTP_MAX_BODY_BYTES=2097152` | `1048576` | post grande passa |
 | Budget chain 10s | `CHAIN_BUDGET_SECONDS=10` | `5.0` | combina com `PROVIDER_A_FAIL=timeout` |
 | Provider A 5s timeout | `PROVIDER_A_TIMEOUT=5` | `2` | testa lentidão maior |
-| Breaker mais sensível | `CB_FAILURE_THRESHOLD=2` | `5` | trippa antes (visível só em tinker) |
+| Breaker mais sensível | `CB_FAILURE_THRESHOLD=2` | `5` | trippa antes |
 | Cooldown maior | `CB_COOLDOWN_SECONDS=60` | `30.0` | breaker fica aberto mais tempo |
+| Breaker compartilhado entre workers | `CB_STORE=file` | `memory` | tripa via curl (§3.3) |
 
-São **14 knobs** em `config/business.php`, todos com defaults canônicos preservados. Listar a tabela completa por cima ([CLAUDE.md §0](../CLAUDE.md)).
+São **15 knobs** em `config/business.php`, todos com defaults canônicos preservados. Listar a tabela completa por cima ([CLAUDE.md §0](../CLAUDE.md)).
 
 Mudanças **estruturais** (novo tipo de débito, novo provider, mudar shape JSON) ainda exigem código. Guias rápidos em [CLAUDE.md §7](../CLAUDE.md).
 
@@ -338,7 +370,7 @@ Abrir, em ordem:
 
 ## 11. Caveats — declarar **antes** que perguntem
 
-1. **Circuit breaker é in-memory por processo.** Não persiste entre requests no PHP padrão — caminhos viáveis: APCu (single-instance) ou Octane. Registrado em [CLAUDE.md §11 #7](../CLAUDE.md).
+1. **Circuit breaker é in-memory por processo no default.** Pra compartilhar estado entre workers numa demo HTTP, ligar `CB_STORE=file` (ver §3.3) — usa `flock()` sobre `storage/app/circuit-breaker/*.json`, single-instance only. Pra cluster ainda precisa APCu ou Redis. Registrado em [CLAUDE.md §11 #7](../CLAUDE.md).
 2. **`composer dev` precisa de `--no-reload`** pra honrar `PHP_CLI_SERVER_WORKERS=4`. Sem isso, o loopback dos mocks bloqueia a si mesmo. Detalhes em [CLAUDE.md §9](../CLAUDE.md).
 3. **Mocks só fora de produção** — guard `! app()->isProduction()` em `routes/web.php`. Não vão pro deploy.
 4. **Tracer é no-op em produção** — só ativa via canal `demo` quando `APP_ENV != production`.
