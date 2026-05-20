@@ -62,6 +62,13 @@ return [
         'circuit_breaker' => [
             'failure_threshold' => (int) env('CB_FAILURE_THRESHOLD', 5),
             'cooldown_seconds' => (float) env('CB_COOLDOWN_SECONDS', 30.0),
+            // Storage backend for the breaker state. `memory` (default) is
+            // per-process — fine for tests and any deployment where each
+            // worker has its own breaker. `file` persists state under
+            // `store_path` so concurrent PHP workers / fresh requests share
+            // the same failure count (needed to demo the breaker via curl).
+            'store' => env('CB_STORE', 'memory'),
+            'store_path' => env('CB_STORE_PATH', storage_path('app/circuit-breaker')),
         ],
     ],
 

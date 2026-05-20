@@ -37,6 +37,7 @@ composer dev                               # API em :8000 com workers concorrent
 | Subir budget do chain | `CHAIN_BUDGET_SECONDS=10` | `5.0` |
 | Trip circuit mais cedo | `CB_FAILURE_THRESHOLD=3` | `5` |
 | Cooldown maior do breaker | `CB_COOLDOWN_SECONDS=60` | `30.0` |
+| Compartilhar breaker entre workers (demo HTTP) | `CB_STORE=file` | `memory` |
 | Body limit maior | `HTTP_MAX_BODY_BYTES=2097152` | `1048576` |
 
 Tudo passa por `config/business.php`. `php artisan config:clear && php artisan serve` aplica.
@@ -374,11 +375,11 @@ php artisan route:list
 | 4 | Hexagonal 3 camadas | Testabilidade + isolamento de Laravel |
 | 5 | Pest 3 | Sintaxe declarativa, integração Laravel |
 | 6 | `Http::retry` nativo do Laravel | Sem libs de resilience extras |
-| 7 | Circuit Breaker in-memory simples | Suficiente para single-instance; cluster fica como melhoria futura |
+| 7 | Circuit Breaker com store pluggável (`memory` default, `file` opt-in via `CB_STORE`) | Default per-process preserva os testes byte-a-byte; `file` (flock sobre `storage/app/circuit-breaker/*.json`) habilita demo HTTP do breaker numa máquina única. Cluster ainda exige Redis/APCu — fica como evolução. |
 | 8 | Exceptions de domínio + handler central | Controllers ficam minimalistas |
 | 9 | Monolog processor global para mask | LGPD por construção, não opt-in |
 | 10 | Resposta JSON com valores como **string** | Precisão preservada na rede |
-| 11 | 14 knobs runtime em `config/business.php` + `.env` overrides | Demo-friendly: trocar taxa de juros, desconto Pix, timeout, threshold do breaker etc. é edit em 1 linha + restart. Defaults canônicos preservam byte-a-byte do enunciado. Mudanças *estruturais* (novo tipo, novo provider) ainda exigem código — §7. |
+| 11 | 15 knobs runtime em `config/business.php` + `.env` overrides | Demo-friendly: trocar taxa de juros, desconto Pix, timeout, threshold do breaker, store do breaker etc. é edit em 1 linha + restart. Defaults canônicos preservam byte-a-byte do enunciado. Mudanças *estruturais* (novo tipo, novo provider) ainda exigem código — §7. |
 | 12 | Demo tracer via port `QueryTracer` + adapter `DemoLogger` em canal Monolog `demo` (stderr) | Application depende da porta, não da impl. ANSI inline pq o `ServeCommand` força `<fg=gray>` nos workers. No-op em produção via flag no construtor. |
 
 ---

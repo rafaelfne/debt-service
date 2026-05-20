@@ -20,6 +20,9 @@ use App\Infrastructure\Providers\ProviderBXmlAdapter;
 use App\Infrastructure\Resilience\CircuitBreaker;
 use App\Infrastructure\Resilience\CircuitBreakerDebtProvider;
 use App\Infrastructure\Resilience\ProviderChain;
+use App\Infrastructure\Resilience\Store\CircuitBreakerStore;
+use App\Infrastructure\Resilience\Store\FileCircuitBreakerStore;
+use App\Infrastructure\Resilience\Store\InMemoryCircuitBreakerStore;
 use DateTimeImmutable;
 use DateTimeZone;
 use Illuminate\Contracts\Foundation\Application;
@@ -88,7 +91,7 @@ class AppServiceProvider extends ServiceProvider
                             retryBackoffMs: (int) config('business.providers.a.backoff_ms'),
                             simulateFailure: (string) config('business.providers.a.fail'),
                         ),
-                        breaker: $this->makeBreaker(),
+                        breaker: $this->makeBreaker('provider-a'),
                     ),
                     new CircuitBreakerDebtProvider(
                         inner: new ProviderBXmlAdapter(
@@ -98,7 +101,7 @@ class AppServiceProvider extends ServiceProvider
                             retryBackoffMs: (int) config('business.providers.b.backoff_ms'),
                             simulateFailure: (string) config('business.providers.b.fail'),
                         ),
-                        breaker: $this->makeBreaker(),
+                        breaker: $this->makeBreaker('provider-b'),
                     ),
                 ],
                 budgetSeconds: (float) config('business.resilience.chain_budget_seconds'),
@@ -113,12 +116,31 @@ class AppServiceProvider extends ServiceProvider
         //
     }
 
-    private function makeBreaker(): CircuitBreaker
+    private function makeBreaker(string $providerSlug): CircuitBreaker
     {
         return new CircuitBreaker(
             failureThreshold: (int) config('business.resilience.circuit_breaker.failure_threshold'),
             cooldownSeconds: (float) config('business.resilience.circuit_breaker.cooldown_seconds'),
             shouldRecordFailure: static fn (Throwable $e): bool => $e instanceof ProviderUnavailableException,
+            store: $this->makeBreakerStore($providerSlug),
         );
+    }
+
+    private function makeBreakerStore(string $providerSlug): CircuitBreakerStore
+    {
+        $driver = (string) config('business.resilience.circuit_breaker.store', 'memory');
+
+        if ($driver === 'file') {
+            $basePath = (string) config(
+                'business.resilience.circuit_breaker.store_path',
+                storage_path('app/circuit-breaker'),
+            );
+
+            return new FileCircuitBreakerStore(
+                path: $basePath.DIRECTORY_SEPARATOR.$providerSlug.'.json',
+            );
+        }
+
+        return new InMemoryCircuitBreakerStore;
     }
 }
